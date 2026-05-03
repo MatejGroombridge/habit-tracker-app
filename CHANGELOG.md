@@ -1,5 +1,10 @@
 # Changelog
 
+
+## v0.1.1 — 2026-05-03
+
+Initial MVP. Functionality to add a habit.
+
 All notable changes to Habit Tracker. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com). The most recent release is at
 the top. Each entry is consumed verbatim by the release pipeline and shown to
