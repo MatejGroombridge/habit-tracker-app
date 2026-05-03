@@ -36,6 +36,10 @@ triggers `.github/workflows/release.yml` to build, sign, attach the APK to a
 GitHub Release, and patch the central manifest. Within ~3 minutes the Groom
 Hub app on your phone offers the new version.
 
+## AI Agent
+
+This repo includes an [`agent.md`](agent.md) with a full guide for AI coding agents (and human developers) building on top of the project template — covering architecture, conventions, build config, signing, the release workflow, and more.
+
 ## Repo layout
 
 ```
