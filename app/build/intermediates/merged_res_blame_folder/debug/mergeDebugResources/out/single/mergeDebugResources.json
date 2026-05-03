@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "dev.matejgroombridge.habittracker.app-debug-57:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "dev.matejgroombridge.habittracker.app-main-59:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "dev.matejgroombridge.habittracker.app-debug-57:/xml_backup_rules.xml.flat",
+        "source": "dev.matejgroombridge.habittracker.app-main-59:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "dev.matejgroombridge.habittracker.app-debug-57:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "dev.matejgroombridge.habittracker.app-main-59:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "dev.matejgroombridge.habittracker.app-debug-57:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "dev.matejgroombridge.habittracker.app-main-59:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "dev.matejgroombridge.habittracker.app-debug-57:/xml_data_extraction_rules.xml.flat",
+        "source": "dev.matejgroombridge.habittracker.app-main-59:/xml/data_extraction_rules.xml"
+    }
+]

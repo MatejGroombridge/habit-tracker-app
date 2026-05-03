@@ -4,24 +4,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.matejgroombridge.habittracker.ui.HomeViewModel
+import dev.matejgroombridge.habittracker.ui.screens.HomeScreen
 import dev.matejgroombridge.habittracker.ui.theme.AppTheme
 
 /**
- * Single-Activity host. Replace the body of [AppContent] with the actual
- * screens for this app — this scaffold just proves the build, theme, splash
- * screen, and edge-to-edge are wired up correctly.
+ * Single-Activity host for the Habit Tracker app.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,27 +28,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    AppContent()
+                    val homeViewModel: HomeViewModel = viewModel(
+                        factory = HomeViewModel.factory(application),
+                    )
+                    HomeScreen(viewModel = homeViewModel)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AppContent() {
-    Scaffold { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Habit Tracker",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
         }
     }
 }

@@ -1,0 +1,45 @@
+{
+    "logs": [
+        {
+            "outputFile": "dev.matejgroombridge.habittracker.app-mergeDebugResources-55:/values-night-v8/values-night-v8.xml",
+            "map": [
+                {
+                    "source": "/Users/mgroombridge/habit-tracker/app/src/main/res/values-night/themes.xml",
+                    "from": {
+                        "startLines": "1,6",
+                        "startColumns": "4,4",
+                        "startOffsets": "63,288",
+                        "endLines": "4,11",
+                        "endColumns": "12,12",
+                        "endOffsets": "282,690"
+                    },
+                    "to": {
+                        "startLines": "3,7",
+                        "startColumns": "4,4",
+                        "startOffsets": "186,410",
+                        "endLines": "6,12",
+                        "endColumns": "12,12",
+                        "endOffsets": "405,810"
+                    }
+                },
+                {
+                    "source": "/Users/mgroombridge/.gradle/caches/9.0.0/transforms/3e1357119119fc505e1e078d30eb3fa9/transformed/core-splashscreen-1.0.1/res/values-night-v8/values-night-v8.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "85",
+                        "endOffsets": "136"
+                    },
+                    "to": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "100",
+                        "endColumns": "85",
+                        "endOffsets": "181"
+                    }
+                }
+            ]
+        }
+    ]
+}
