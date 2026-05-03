@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v0.2.0 — 2026-05-03
+
+UI Overhaul + Settings tab
+
+
 ## v0.1.1 — 2026-05-03
 
 Initial MVP. Functionality to add a habit.
