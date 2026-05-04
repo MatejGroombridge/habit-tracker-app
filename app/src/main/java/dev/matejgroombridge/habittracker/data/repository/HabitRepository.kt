@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.matejgroombridge.habittracker.data.model.Habit
+import dev.matejgroombridge.habittracker.data.model.HabitFrequency
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
@@ -19,14 +20,17 @@ private val Context.habitsDataStore: DataStore<Preferences> by preferencesDataSt
  * DataStore that stores the habit list as a JSON-encoded string under one key.
  *
  * For a personal-scale habit tracker this is intentionally simple — there's no
- * Room database, no migrations, just one JSON blob. If the schema needs to
- * evolve later, write a one-shot migration in [load].
+ * Room database, no migrations, just one JSON blob. Adding new fields to
+ * [Habit] is safe because the JSON parser is configured with
+ * `ignoreUnknownKeys = true` and every new field has a default value.
  */
 class HabitRepository(private val context: Context) {
 
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+        // Permit defaults to be omitted in serialized form for older blobs.
+        isLenient = true
     }
 
     private val listSerializer = ListSerializer(Habit.serializer())
@@ -35,11 +39,64 @@ class HabitRepository(private val context: Context) {
         load(prefs[KEY_HABITS_JSON])
     }
 
-    suspend fun addHabit(name: String, todayEpochDay: Long) {
+    /**
+     * Creates a new habit. All optional fields default to sensible values
+     * matching [Habit]'s defaults.
+     */
+    suspend fun addHabit(
+        name: String,
+        todayEpochDay: Long,
+        description: String = "",
+        iconKey: String = Habit.DEFAULT_ICON_KEY,
+        colorKey: String = Habit.DEFAULT_COLOR_KEY,
+        frequency: HabitFrequency = HabitFrequency.Daily,
+    ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         update { current ->
-            current + Habit(name = trimmed, createdAtEpochDay = todayEpochDay)
+            current + Habit(
+                name = trimmed,
+                description = description.trim(),
+                iconKey = iconKey,
+                colorKey = colorKey,
+                frequency = frequency,
+                createdAtEpochDay = todayEpochDay,
+            )
+        }
+    }
+
+    /** Replace mutable fields on an existing habit. Completion history and id are preserved. */
+    suspend fun updateHabit(
+        habitId: String,
+        name: String,
+        description: String,
+        iconKey: String,
+        colorKey: String,
+        frequency: HabitFrequency,
+    ) {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) return
+        update { current ->
+            current.map { h ->
+                if (h.id == habitId) {
+                    h.copy(
+                        name = trimmedName,
+                        description = description.trim(),
+                        iconKey = iconKey,
+                        colorKey = colorKey,
+                        frequency = frequency,
+                    )
+                } else h
+            }
+        }
+    }
+
+    suspend fun setCompleted(habitId: String, epochDay: Long, completed: Boolean) {
+        update { current ->
+            current.map { h ->
+                if (h.id != habitId) h
+                else if (completed) h.markCompleted(epochDay) else h.markNotCompleted(epochDay)
+            }
         }
     }
 
@@ -48,6 +105,12 @@ class HabitRepository(private val context: Context) {
             current.map { habit ->
                 if (habit.id == habitId) habit.toggleCompletion(epochDay) else habit
             }
+        }
+    }
+
+    suspend fun setArchived(habitId: String, archived: Boolean) {
+        update { current ->
+            current.map { h -> if (h.id == habitId) h.copy(archived = archived) else h }
         }
     }
 

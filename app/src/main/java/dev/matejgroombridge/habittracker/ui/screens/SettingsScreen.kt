@@ -20,13 +20,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -70,16 +68,15 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // ─── Appearance ──────────────────────────────────────
             Section("Appearance") {
                 Text(
                     text = "Theme",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
                         ThemeMode.System to "System",
@@ -95,17 +92,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ─── Habits ──────────────────────────────────────────
-            Section("Habits") {
-                ToggleRow(
-                    title = "Show streaks",
-                    subtitle = "Display the current streak under each habit's name.",
-                    checked = settings.showStreaks,
-                    onCheckedChange = viewModel::setShowStreaks,
-                )
-            }
-
-            // ─── About ───────────────────────────────────────────
             Section("About") {
                 Text(
                     text = stringResource(R.string.app_name),
@@ -113,6 +99,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     style = MaterialTheme.typography.bodyMedium,
@@ -140,33 +127,5 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         ) {
             Column(modifier = Modifier.padding(20.dp)) { content() }
         }
-    }
-}
-
-@Composable
-private fun ToggleRow(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (subtitle != null) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.padding(horizontal = 8.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

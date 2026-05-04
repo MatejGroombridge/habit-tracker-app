@@ -28,10 +28,6 @@ class SettingsViewModel(
         viewModelScope.launch { repository.setThemeMode(mode) }
     }
 
-    fun setShowStreaks(show: Boolean) {
-        viewModelScope.launch { repository.setShowStreaks(show) }
-    }
-
     companion object {
         fun factory(application: Application): ViewModelProvider.Factory = viewModelFactory {
             initializer {

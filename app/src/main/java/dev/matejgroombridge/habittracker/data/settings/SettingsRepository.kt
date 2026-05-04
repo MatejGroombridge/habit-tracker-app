@@ -3,7 +3,6 @@ package dev.matejgroombridge.habittracker.data.settings
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -23,7 +22,6 @@ class SettingsRepository(private val context: Context) {
     val settings: Flow<Settings> = context.settingsDataStore.data.map { prefs ->
         Settings(
             themeMode = prefs[KEY_THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
-            showStreaks = prefs[KEY_SHOW_STREAKS] ?: false,
         )
     }
 
@@ -33,18 +31,11 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
-    suspend fun setShowStreaks(show: Boolean) {
-        context.settingsDataStore.edit { prefs ->
-            prefs[KEY_SHOW_STREAKS] = show
-        }
-    }
-
     private fun parseThemeMode(raw: String): ThemeMode = runCatching {
         ThemeMode.valueOf(raw)
     }.getOrDefault(ThemeMode.System)
 
     private companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
-        val KEY_SHOW_STREAKS = booleanPreferencesKey("show_streaks")
     }
 }

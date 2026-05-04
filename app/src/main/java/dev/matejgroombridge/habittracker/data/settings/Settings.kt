@@ -9,6 +9,4 @@ import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
  */
 data class Settings(
     val themeMode: ThemeMode = ThemeMode.System,
-    /** When false (the default), habit cards do not display the streak counter. */
-    val showStreaks: Boolean = false,
 )
