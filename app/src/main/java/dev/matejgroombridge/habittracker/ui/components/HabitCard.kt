@@ -60,9 +60,14 @@ fun HabitCard(
 
     val baseContainer = color.containerColor()
     val baseContent = color.contentColor()
+    val screenBg = MaterialTheme.colorScheme.background
+
+    // Uncompleted cards are pulled slightly toward the screen background so
+    // completed cards visually pop a bit more.
+    val mutedContainer = blend(baseContainer, screenBg, 0.35f)
 
     val containerColor by animateColorAsState(
-        targetValue = if (visuallyCompleted) blend(baseContainer, color.accent, 0.35f) else baseContainer,
+        targetValue = if (visuallyCompleted) blend(baseContainer, color.accent, 0.35f) else mutedContainer,
         label = "containerColor",
     )
 
@@ -154,7 +159,7 @@ private fun subtitleFor(
             val mostRecent = habit.completedDays.filter { it < today }.maxOrNull()
             if (mostRecent != null) {
                 val daysLeft = (f.days - (today - mostRecent)).toInt().coerceAtLeast(0)
-                if (daysLeft > 0) "Next due in $daysLeft day${if (daysLeft == 1) "" else "s"}"
+                if (daysLeft > 0) "Resets in $daysLeft day${if (daysLeft == 1) "" else "s"}"
                 else "Due today"
             } else "Every ${f.days} days"
         }

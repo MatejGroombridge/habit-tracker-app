@@ -1,7 +1,6 @@
 package dev.matejgroombridge.habittracker.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -41,31 +41,34 @@ import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
 import dev.matejgroombridge.habittracker.ui.theme.HabitColors
 import dev.matejgroombridge.habittracker.ui.theme.HabitIcons
-import dev.matejgroombridge.habittracker.ui.theme.contentColor
 import java.time.DayOfWeek
 import java.time.LocalDate
 
-private const val DEFAULT_WEEKS = 16
-
 /**
- * Per-habit analytics. Each row shows: the habit's icon + name + completions
- * + streak (with fire icon), then a 7×N contribution grid (rows = Mon..Sun,
- * cols = N weeks back, rightmost = current week). The grid sits directly on
- * the screen background — no card wrapping — so the cells read as the only
- * visual structure.
+ * Per-habit "all time" analytics. Each row shows: the habit's icon + name +
+ * total completions + streak (with fire icon), then a 7-row × N-week
+ * GitHub-style contribution grid.
+ *
+ * Grid layout details:
+ *  - Uses a [LazyRow] with `reverseLayout = true` so the most recent week is
+ *    pinned to the right edge of the screen and older weeks scroll off to
+ *    the left.
+ *  - The grid grows naturally as the habit ages: weeks earlier than the
+ *    habit's creation date are simply not emitted.
+ *  - Days that haven't happened yet in the current week render as a faded
+ *    version of the empty cell so the column shape is preserved.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
     viewModel: HomeViewModel,
     contentPadding: PaddingValues = PaddingValues(),
-    weeks: Int = DEFAULT_WEEKS,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
     val todayDate = remember(today) { LocalDate.ofEpochDay(today) }
 
-    // Sunday at the end of the current week — the rightmost column ends on this date.
+    // Sunday at the end of the current week — the rightmost column ends here.
     val endOfCurrentWeek = remember(todayDate) {
         val daysAfterMon = ((todayDate.dayOfWeek.value - DayOfWeek.MONDAY.value) + 7) % 7
         val mondayOfThisWeek = todayDate.minusDays(daysAfterMon.toLong())
@@ -76,7 +79,7 @@ fun AnalyticsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Analytics") },
+                title = { Text("All time") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -96,18 +99,15 @@ fun AnalyticsScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
                 top = 8.dp,
                 bottom = contentPadding.calculateBottomPadding() + 24.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             items(items = state.activeHabits, key = { it.id }) { habit ->
                 AnalyticsRow(
                     habit = habit,
                     today = today,
-                    weeks = weeks,
                     endOfCurrentWeek = endOfCurrentWeek,
                 )
             }
@@ -119,7 +119,6 @@ fun AnalyticsScreen(
 private fun AnalyticsRow(
     habit: Habit,
     today: Long,
-    weeks: Int,
     endOfCurrentWeek: LocalDate,
 ) {
     val color = HabitColors.entry(habit.colorKey)
@@ -132,7 +131,12 @@ private fun AnalyticsRow(
     val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Header sits inside the standard horizontal padding so it lines up
+        // with the rest of the app.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        ) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -180,54 +184,81 @@ private fun AnalyticsRow(
         }
         Spacer(Modifier.height(12.dp))
         ContributionGrid(
+            createdAtEpochDay = habit.createdAtEpochDay,
             completedDays = habit.completedDays,
             today = today,
             endOfCurrentWeek = endOfCurrentWeek,
-            weeks = weeks,
             accent = color.accent,
             emptyTint = MaterialTheme.colorScheme.surfaceContainerHigh,
         )
     }
 }
 
+private const val MIN_WEEKS = 16
+
 @Composable
 private fun ContributionGrid(
+    createdAtEpochDay: Long,
     completedDays: Set<Long>,
     today: Long,
     endOfCurrentWeek: LocalDate,
-    weeks: Int,
     accent: Color,
     emptyTint: Color,
 ) {
-    val firstMonday = remember(endOfCurrentWeek, weeks) {
-        endOfCurrentWeek.minusDays(6).minusWeeks((weeks - 1).toLong())
+    // How many weeks of history do we have between creation and the end of
+    // this week? We always render at least MIN_WEEKS so the grid feels
+    // populated even on a brand-new habit; the user can scroll left to see
+    // any pre-creation columns (which all render as empty/future cells).
+    val weeksAvailable = remember(createdAtEpochDay, endOfCurrentWeek) {
+        val createdDate = LocalDate.ofEpochDay(createdAtEpochDay)
+        val daysBetween = java.time.temporal.ChronoUnit.DAYS
+            .between(createdDate, endOfCurrentWeek).toInt()
+        // +1 because both endpoints inclusive when computing weeks of coverage.
+        val computed = (daysBetween + 6) / 7 + 1
+        maxOf(MIN_WEEKS, computed)
+    }
+
+    val scrollState = rememberScrollState()
+
+    // Snap to the rightmost (most recent) week on first composition + every
+    // time the available week count grows.
+    androidx.compose.runtime.LaunchedEffect(weeksAvailable) {
+        scrollState.scrollTo(scrollState.maxValue)
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .horizontalScroll(scrollState),
+        // Push columns toward the right edge so the most recent week is
+        // flush with the screen's right side and older weeks fill leftward.
+        horizontalArrangement = Arrangement.End,
     ) {
-        for (week in 0 until weeks) {
-            val weekMonday = firstMonday.plusWeeks(week.toLong())
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Render oldest → newest so the rightmost (last) column is the
+        // current week.
+        for (weeksBack in (weeksAvailable - 1) downTo 0) {
+            val weekMonday = endOfCurrentWeek.minusDays(6).minusWeeks(weeksBack.toLong())
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(end = if (weeksBack == 0) 0.dp else 3.dp),
+            ) {
                 for (offset in 0..6) {
                     val cellDate = weekMonday.plusDays(offset.toLong())
                     val cellEpoch = cellDate.toEpochDay()
                     val inFuture = cellEpoch > today
                     val completed = cellEpoch in completedDays
+                    val cellColor = when {
+                        completed -> accent
+                        // Future cells: slightly faded version of empty so the
+                        // grid keeps its 7-row shape without looking "missing".
+                        inFuture -> emptyTint.copy(alpha = 0.35f)
+                        else -> emptyTint
+                    }
                     Box(
                         modifier = Modifier
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                when {
-                                    inFuture -> Color.Transparent
-                                    completed -> accent
-                                    else -> emptyTint
-                                },
-                            ),
+                            .size(12.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(cellColor),
                     )
                 }
             }

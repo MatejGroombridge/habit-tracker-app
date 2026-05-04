@@ -62,7 +62,7 @@ private data class BottomTab(
 private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HOME, "Today", Icons.Outlined.CheckCircle),
     BottomTab(Routes.PAST_WEEK, "Past week", Icons.Outlined.CalendarViewWeek),
-    BottomTab(Routes.ANALYTICS, "Analytics", Icons.Outlined.BarChart),
+    BottomTab(Routes.ANALYTICS, "All time", Icons.Outlined.BarChart),
 )
 
 class MainActivity : ComponentActivity() {

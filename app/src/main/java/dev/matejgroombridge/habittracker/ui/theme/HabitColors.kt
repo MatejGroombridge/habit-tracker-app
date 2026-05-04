@@ -105,6 +105,38 @@ object HabitColors {
             accent = Color(0xFFCBB68A),
             onColor = Color(0xFF2C2516),
         ),
+        HabitColorEntry(
+            key = "coral",
+            label = "Coral",
+            light = Color(0xFFFFD9CC),
+            dark = Color(0xFF5A3A30),
+            accent = Color(0xFFFFA688),
+            onColor = Color(0xFF3A1B0F),
+        ),
+        HabitColorEntry(
+            key = "teal",
+            label = "Teal",
+            light = Color(0xFFCFE8E4),
+            dark = Color(0xFF2F4D49),
+            accent = Color(0xFF8DCDC4),
+            onColor = Color(0xFF143230),
+        ),
+        HabitColorEntry(
+            key = "periwinkle",
+            label = "Periwinkle",
+            light = Color(0xFFD7DDF7),
+            dark = Color(0xFF373E5E),
+            accent = Color(0xFFA1ACE0),
+            onColor = Color(0xFF1A2148),
+        ),
+        HabitColorEntry(
+            key = "fog",
+            label = "Fog",
+            light = Color(0xFFE2E5EA),
+            dark = Color(0xFF40454D),
+            accent = Color(0xFFB6BCC6),
+            onColor = Color(0xFF22262D),
+        ),
     )
 
     private val byKey: Map<String, HabitColorEntry> = palette.associateBy { it.key }

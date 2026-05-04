@@ -2,8 +2,12 @@ package dev.matejgroombridge.habittracker.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,11 +18,9 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
 import dev.matejgroombridge.habittracker.ui.SettingsViewModel
+import dev.matejgroombridge.habittracker.ui.components.ConfettiOverlay
 import dev.matejgroombridge.habittracker.ui.components.HabitCard
 import dev.matejgroombridge.habittracker.ui.components.HabitEditorDialog
 import dev.matejgroombridge.habittracker.ui.components.HabitEditorResult
@@ -53,9 +55,6 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenArchive: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
-    /** When true, immediately open the create-habit dialog (used to drive the
-     *  FAB that lives in the parent shell). The parent should set it back to
-     *  false via [onCreateDialogConsumed] once we open it. */
     requestCreate: Boolean = false,
     onCreateDialogConsumed: () -> Unit = {},
 ) {
@@ -69,48 +68,54 @@ fun HomeScreen(
         }
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Track all-complete transitions so we can fire confetti when the user
+    // completes the final outstanding habit. We only fire on the *transition*
+    // (not the initial state), so opening the app on an already-complete day
+    // doesn't trigger a redundant burst.
+    val allComplete = state.activeHabits.isNotEmpty() &&
+        state.activeHabits.all { it.isVisuallyCompletedOn(state.todayEpochDay) }
+    var previousAllComplete by remember { mutableStateOf<Boolean?>(null) }
+    var fireConfetti by remember { mutableStateOf(false) }
+    LaunchedEffect(allComplete) {
+        val prev = previousAllComplete
+        if (prev != null && !prev && allComplete) {
+            // Toggle through to retrigger ConfettiOverlay's LaunchedEffect.
+            fireConfetti = false
+            fireConfetti = true
+        }
+        previousAllComplete = allComplete
+    }
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            LargeTopAppBar(
-                title = { Text("Habits") },
-                actions = {
-                    IconButton(onClick = onOpenArchive) {
-                        Icon(
-                            imageVector = Icons.Outlined.Archive,
-                            contentDescription = "Archived habits",
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                ),
-                scrollBehavior = scrollBehavior,
-            )
-        },
     ) { padding ->
-        if (state.activeHabits.isEmpty()) {
-            EmptyState(modifier = Modifier.padding(padding))
-        } else {
-            HabitsGrid(
-                habits = state.activeHabits,
-                todayEpochDay = state.todayEpochDay,
-                contentPadding = mergePadding(padding, contentPadding),
-                onToggle = viewModel::toggleToday,
-                onLongPress = { habit -> dialog = HomeDialog.Edit(habit) },
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // We render the title + actions inline (instead of in `topBar`)
+            // so the habit cards can sit directly underneath the title with
+            // no extra padding leftover from the topbar's vertical centering.
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding()),
+            ) {
+                HabitsHeader(
+                    onOpenArchive = onOpenArchive,
+                    onOpenSettings = onOpenSettings,
+                )
+                if (state.activeHabits.isEmpty()) {
+                    EmptyState()
+                } else {
+                    HabitsGrid(
+                        habits = state.activeHabits,
+                        todayEpochDay = state.todayEpochDay,
+                        bottomPadding = contentPadding.calculateBottomPadding() + 24.dp,
+                        onToggle = viewModel::toggleToday,
+                        onLongPress = { habit -> dialog = HomeDialog.Edit(habit) },
+                    )
+                }
+            }
+            ConfettiOverlay(trigger = fireConfetti)
         }
     }
 
@@ -154,11 +159,60 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Inline title + actions row. Larger headline, bottom-aligned so it sits
+ * "down the page" (similar to a M3 LargeTopAppBar in its expanded state),
+ * but with no baseline padding below the title so habit cards can sit
+ * directly underneath.
+ */
+@Composable
+private fun HabitsHeader(
+    onOpenArchive: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(112.dp),
+    ) {
+        // Action icons pinned to the top-right.
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 4.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onOpenArchive) {
+                Icon(
+                    imageVector = Icons.Outlined.Archive,
+                    contentDescription = "Archived habits",
+                )
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings",
+                )
+            }
+        }
+        // Headline aligned to the bottom-start so cards immediately below
+        // sit flush with the underline of the text.
+        Text(
+            text = "Habits",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 20.dp, bottom = 18.dp),
+        )
+    }
+}
+
 @Composable
 private fun HabitsGrid(
     habits: List<Habit>,
     todayEpochDay: Long,
-    contentPadding: PaddingValues,
+    bottomPadding: androidx.compose.ui.unit.Dp,
     onToggle: (String) -> Unit,
     onLongPress: (Habit) -> Unit,
 ) {
@@ -168,8 +222,8 @@ private fun HabitsGrid(
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
-            top = contentPadding.calculateTopPadding() + 4.dp,
-            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+            top = 0.dp,
+            bottom = bottomPadding,
         ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

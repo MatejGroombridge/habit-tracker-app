@@ -1,6 +1,7 @@
 package dev.matejgroombridge.habittracker.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,22 +11,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -62,9 +67,13 @@ sealed interface HabitEditorResult {
 }
 
 /**
- * Single dialog used both for creating and editing a habit. Colour is
- * assigned randomly on creation (no user picker); icon is selected by tapping
- * the current icon to open a picker dialog.
+ * Single dialog for both creating and editing a habit. The icon badge in the
+ * top-left opens a combined icon + colour picker. Colour is randomised on
+ * creation (the user can change it from the picker if they want).
+ *
+ * For edit mode, archive is a small icon-only action at the top-right of the
+ * dialog title row, and delete is a destructive icon-only button on the
+ * action bar — keeps the bottom row uncluttered.
  */
 @Composable
 fun HabitEditorDialog(
@@ -77,9 +86,8 @@ fun HabitEditorDialog(
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
     var description by remember { mutableStateOf(existing?.description.orEmpty()) }
     var iconKey by remember { mutableStateOf(existing?.iconKey ?: Habit.DEFAULT_ICON_KEY) }
-    // Colour is randomised on creation and preserved on edit.
-    val colorKey = remember(existing?.id) {
-        existing?.colorKey ?: HabitColors.palette.random().key
+    var colorKey by remember {
+        mutableStateOf(existing?.colorKey ?: HabitColors.palette.random().key)
     }
 
     val initialFrequency = existing?.frequency ?: HabitFrequency.Daily
@@ -122,7 +130,26 @@ fun HabitEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isEdit) "Edit habit" else "New habit") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isEdit) "Edit habit" else "New habit",
+                    modifier = Modifier.weight(1f),
+                )
+                if (isEdit) {
+                    val archived = existing?.archived == true
+                    IconButton(onClick = {
+                        onResult(HabitEditorResult.Archive(!archived))
+                    }) {
+                        Icon(
+                            imageVector = if (archived) Icons.Outlined.Unarchive
+                            else Icons.Outlined.Archive,
+                            contentDescription = if (archived) "Restore" else "Archive",
+                        )
+                    }
+                }
+            }
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -131,7 +158,6 @@ fun HabitEditorDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                // Icon + title share a row: tap icon to change it.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -169,17 +195,6 @@ fun HabitEditorDialog(
                     intervalDays = intervalDays,
                     onIntervalChange = { intervalDays = it.coerceIn(1, 30) },
                 )
-
-                if (isEdit) {
-                    Spacer(Modifier.height(2.dp))
-                    EditorActionRow(
-                        archived = existing?.archived == true,
-                        onArchiveToggle = {
-                            onResult(HabitEditorResult.Archive(!(existing?.archived ?: false)))
-                        },
-                        onDelete = { onResult(HabitEditorResult.Delete) },
-                    )
-                }
             }
         },
         confirmButton = {
@@ -188,17 +203,29 @@ fun HabitEditorDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            // Cancel sits on the left; in edit mode we also surface a small
+            // delete icon-button beside it so it doesn't crowd save.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isEdit) {
+                    IconButton(onClick = { onResult(HabitEditorResult.Delete) }) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         },
     )
 
     if (showIconPicker) {
-        IconPickerDialog(
-            selectedKey = iconKey,
-            onSelected = {
-                iconKey = it
-                showIconPicker = false
-            },
+        IconAndColorPickerDialog(
+            selectedIconKey = iconKey,
+            selectedColorKey = colorKey,
+            onIconSelected = { iconKey = it },
+            onColorSelected = { colorKey = it },
             onDismiss = { showIconPicker = false },
         )
     }
@@ -238,55 +265,94 @@ private fun IconBadge(iconKey: String, colorKey: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun IconPickerDialog(
-    selectedKey: String,
-    onSelected: (String) -> Unit,
+private fun IconAndColorPickerDialog(
+    selectedIconKey: String,
+    selectedColorKey: String,
+    onIconSelected: (String) -> Unit,
+    onColorSelected: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Choose an icon") },
         text = {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(5),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(
-                    count = HabitIcons.catalog.size,
-                    key = { HabitIcons.catalog[it].key },
-                ) { index ->
-                    val entry = HabitIcons.catalog[index]
-                    val selected = entry.key == selectedKey
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            )
-                            .clickable { onSelected(entry.key) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = entry.icon,
-                            contentDescription = entry.label,
-                            tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                ColorRow(selectedKey = selectedColorKey, onSelected = onColorSelected)
+                IconGrid(
+                    selectedKey = selectedIconKey,
+                    accent = HabitColors.entry(selectedColorKey).accent,
+                    onSelected = onIconSelected,
+                )
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Done") }
         },
     )
+}
+
+@Composable
+private fun ColorRow(selectedKey: String, onSelected: (String) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        HabitColors.palette.forEach { entry ->
+            val selected = entry.key == selectedKey
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(entry.accent)
+                    .border(
+                        width = if (selected) 3.dp else 1.dp,
+                        color = if (selected) MaterialTheme.colorScheme.onSurface
+                        else Color.Black.copy(alpha = 0.10f),
+                        shape = CircleShape,
+                    )
+                    .clickable { onSelected(entry.key) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun IconGrid(selectedKey: String, accent: Color, onSelected: (String) -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(5),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 320.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(
+            count = HabitIcons.catalog.size,
+            key = { HabitIcons.catalog[it].key },
+        ) { index ->
+            val entry = HabitIcons.catalog[index]
+            val selected = entry.key == selectedKey
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (selected) accent
+                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    )
+                    .clickable { onSelected(entry.key) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = entry.icon,
+                    contentDescription = entry.label,
+                    tint = if (selected) Color.Black.copy(alpha = 0.85f)
+                    else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -311,19 +377,20 @@ private fun FrequencyPicker(
             FilterChip(
                 selected = kind == FrequencyKind.EveryN,
                 onClick = { onKindChange(FrequencyKind.EveryN) },
-                label = { Text("Every X days") },
+                label = { Text("Custom") },
             )
         }
         if (kind == FrequencyKind.EveryN) {
+            // Compact pill-shaped stepper centred under the chips.
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Every", style = MaterialTheme.typography.bodyMedium)
-                IntervalStepper(value = intervalDays, onChange = onIntervalChange)
-                Text(
-                    text = if (intervalDays == 1) "day" else "days",
-                    style = MaterialTheme.typography.bodyMedium,
+                CompactStepper(
+                    value = intervalDays,
+                    onChange = onIntervalChange,
+                    suffix = if (intervalDays == 1) "day" else "days",
                 )
             }
         }
@@ -331,56 +398,63 @@ private fun FrequencyPicker(
 }
 
 @Composable
-private fun IntervalStepper(value: Int, onChange: (Int) -> Unit) {
+private fun CompactStepper(value: Int, onChange: (Int) -> Unit, suffix: String) {
+    val shape = RoundedCornerShape(24.dp)
     Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        AssistChip(onClick = { onChange(value - 1) }, label = { Text("−") })
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(value.toString(), style = MaterialTheme.typography.titleMedium)
-        }
-        AssistChip(onClick = { onChange(value + 1) }, label = { Text("+") })
+        StepperButton(
+            icon = Icons.Outlined.Remove,
+            description = "Decrease",
+            enabled = value > 1,
+            onClick = { onChange(value - 1) },
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = "Every $value $suffix",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        StepperButton(
+            icon = Icons.Outlined.Add,
+            description = "Increase",
+            enabled = value < 30,
+            onClick = { onChange(value + 1) },
+        )
     }
 }
 
 @Composable
-private fun EditorActionRow(
-    archived: Boolean,
-    onArchiveToggle: () -> Unit,
-    onDelete: () -> Unit,
+private fun StepperButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(
+                if (enabled) MaterialTheme.colorScheme.surface
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+            )
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        TextButton(onClick = onArchiveToggle) {
-            Icon(
-                imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(if (archived) "Restore" else "Archive")
-        }
-        Spacer(Modifier.weight(1f))
-        TextButton(onClick = onDelete) {
-            Icon(
-                imageVector = Icons.Outlined.DeleteOutline,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text("Delete", color = MaterialTheme.colorScheme.error)
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = MaterialTheme.colorScheme.onSurface.copy(
+                alpha = if (enabled) 1f else 0.4f,
+            ),
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
