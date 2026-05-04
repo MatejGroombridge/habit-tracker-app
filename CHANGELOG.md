@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v0.4.0 — 2026-05-04
+
+Core functionality + multiple views
+
+
 ## v0.3.0 — 2026-05-04
 
 Frequency, icons, pastel colours, archive, past-week and analytics screens
