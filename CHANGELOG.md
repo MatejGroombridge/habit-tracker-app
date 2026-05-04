@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v0.3.0 — 2026-05-04
+
+Frequency, icons, pastel colours, archive, past-week and analytics screens
+
+
 ## v0.2.0 — 2026-05-03
 
 UI Overhaul + Settings tab
