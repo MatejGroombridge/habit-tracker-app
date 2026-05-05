@@ -18,10 +18,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -207,6 +209,8 @@ private fun AnalyticsRow(
         ContributionGrid(
             createdAtEpochDay = habit.createdAtEpochDay,
             completedDays = habit.completedDays,
+            skippedDays = habit.skippedDays,
+            pausedSinceEpochDay = habit.pausedSinceEpochDay,
             today = today,
             endOfCurrentWeek = endOfCurrentWeek,
             accent = color.accent,
@@ -224,6 +228,8 @@ private val GRID_RIGHT_PADDING = 12.dp
 private fun ContributionGrid(
     createdAtEpochDay: Long,
     completedDays: Set<Long>,
+    skippedDays: Set<Long>,
+    pausedSinceEpochDay: Long?,
     today: Long,
     endOfCurrentWeek: LocalDate,
     accent: Color,
@@ -282,22 +288,81 @@ private fun ContributionGrid(
                         val cellEpoch = cellDate.toEpochDay()
                         val inFuture = cellEpoch > today
                         val completed = cellEpoch in completedDays
-                        val cellColor = when {
-                            completed -> accent
-                            // Future cells: slightly faded version of empty so the
-                            // grid keeps its 7-row shape without looking "missing".
-                            inFuture -> emptyTint.copy(alpha = 0.35f)
-                            else -> emptyTint
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(CELL_SIZE)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(cellColor),
+                        val skipped = cellEpoch in skippedDays
+                        val paused = pausedSinceEpochDay != null && cellEpoch >= pausedSinceEpochDay
+                        GridCell(
+                            completed = completed,
+                            skipped = skipped,
+                            paused = paused,
+                            inFuture = inFuture,
+                            accent = accent,
+                            emptyTint = emptyTint,
                         )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Single cell in the analytics contribution grid. Visual rules:
+ *  - **Completed**: filled square in the habit's accent.
+ *  - **Skipped**: filled circle in a muted accent — clearly distinct from a
+ *    full completion (different shape) but visible at a glance.
+ *  - **Paused** (any day on or after the pause date): pause "‖" symbol that
+ *    fills the whole cell (rounded square background tinted with the muted
+ *    accent so a paused stretch reads as a single visual block).
+ *  - **Future**: faded empty so the grid shape is preserved.
+ *  - **Otherwise**: empty filled square.
+ */
+@Composable
+private fun GridCell(
+    completed: Boolean,
+    skipped: Boolean,
+    paused: Boolean,
+    inFuture: Boolean,
+    accent: Color,
+    emptyTint: Color,
+) {
+    when {
+        // Pause overrides skip & complete: the user explicitly froze tracking
+        // for these days, so render a pause glyph rather than an apparent
+        // achievement. Background takes the full cell and the icon scales
+        // up to occupy ~80% of it so the pause state reads instantly.
+        paused -> Box(
+            modifier = Modifier
+                .size(CELL_SIZE)
+                .clip(RoundedCornerShape(3.dp))
+                .background(accent.copy(alpha = 0.20f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Pause,
+                contentDescription = "Paused",
+                tint = accent,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        // Filled accent circle for skipped days. Slightly muted so the user
+        // can still tell it apart from a completion at a glance.
+        skipped -> Box(
+            modifier = Modifier
+                .size(CELL_SIZE)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.55f)),
+        )
+        completed -> Box(
+            modifier = Modifier
+                .size(CELL_SIZE)
+                .clip(RoundedCornerShape(3.dp))
+                .background(accent),
+        )
+        else -> Box(
+            modifier = Modifier
+                .size(CELL_SIZE)
+                .clip(RoundedCornerShape(3.dp))
+                .background(if (inFuture) emptyTint.copy(alpha = 0.35f) else emptyTint),
+        )
     }
 }

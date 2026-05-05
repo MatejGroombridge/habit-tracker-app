@@ -73,9 +73,12 @@ class HomeViewModel(
         iconKey: String,
         colorKey: String,
         frequency: HabitFrequency,
+        skipsPerWeek: Int = -1,
     ) {
         viewModelScope.launch {
-            repository.updateHabit(habitId, name, description, iconKey, colorKey, frequency)
+            repository.updateHabit(
+                habitId, name, description, iconKey, colorKey, frequency, skipsPerWeek
+            )
         }
     }
 
@@ -87,6 +90,19 @@ class HomeViewModel(
         viewModelScope.launch { repository.setCompleted(habitId, epochDay, completed) }
     }
 
+    fun setSkipped(habitId: String, epochDay: Long, skipped: Boolean) {
+        viewModelScope.launch { repository.setSkipped(habitId, epochDay, skipped) }
+    }
+
+    fun setPaused(habitId: String, paused: Boolean) {
+        viewModelScope.launch { repository.setPaused(habitId, paused, today) }
+    }
+
+    /** Toggle whether [habitId] should be included in daily reminder notifications. */
+    fun setIncludeInReminders(habitId: String, include: Boolean) {
+        viewModelScope.launch { repository.setIncludeInReminders(habitId, include) }
+    }
+
     fun setArchived(habitId: String, archived: Boolean) {
         viewModelScope.launch { repository.setArchived(habitId, archived) }
     }
@@ -94,6 +110,17 @@ class HomeViewModel(
     fun deleteHabit(habitId: String) {
         viewModelScope.launch { repository.deleteHabit(habitId) }
     }
+
+    /** Reorder the active habits to match [orderedActiveIds]. */
+    fun setOrdering(orderedActiveIds: List<String>) {
+        viewModelScope.launch { repository.setOrdering(orderedActiveIds) }
+    }
+
+    /** Returns the JSON of the user's current habit list, or null if the call fails. */
+    suspend fun exportJson(): String? = runCatching { repository.exportJson() }.getOrNull()
+
+    /** Imports the JSON, returning the count of imported habits, or null on failure. */
+    suspend fun importJson(rawJson: String): Int? = repository.importJson(rawJson)
 
     companion object {
         fun factory(application: Application): ViewModelProvider.Factory = viewModelFactory {

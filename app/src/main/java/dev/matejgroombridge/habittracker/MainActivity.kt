@@ -44,10 +44,12 @@ import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.data.repository.HabitRepository
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
 import dev.matejgroombridge.habittracker.ui.SettingsViewModel
+import dev.matejgroombridge.habittracker.ui.util.rememberHaptics
 import dev.matejgroombridge.habittracker.ui.screens.AnalyticsScreen
 import dev.matejgroombridge.habittracker.ui.screens.ArchivedHabitsScreen
 import dev.matejgroombridge.habittracker.ui.screens.HomeScreen
 import dev.matejgroombridge.habittracker.ui.screens.PastWeekScreen
+import dev.matejgroombridge.habittracker.ui.screens.ReorderHabitsScreen
 import dev.matejgroombridge.habittracker.ui.screens.SettingsScreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -57,6 +59,8 @@ private object Routes {
     const val MAIN = "main"
     const val SETTINGS = "settings"
     const val ARCHIVE = "archive"
+    const val REORDER = "reorder"
+    const val WRITE_NFC = "write_nfc"
 }
 
 private data class BottomTab(
@@ -64,11 +68,14 @@ private data class BottomTab(
     val icon: ImageVector,
 )
 
-// Order is intentional: pager index 0 → Today, 1 → Past Week, 2 → All Time.
+// Order is intentional: pager index 0 → Past Week, 1 → Today, 2 → All Time.
+// Today sits in the middle so the user can swipe to it from either side; it's
+// also the page the app launches on (see [TODAY_PAGE_INDEX] / initialPage).
 // Adjust both this list AND the `when (page)` switch in MainPager() to add a tab.
+private const val TODAY_PAGE_INDEX = 1
 private val BOTTOM_TABS = listOf(
-    BottomTab("Today", Icons.Outlined.CheckCircle),
     BottomTab("Past Week", Icons.Outlined.CalendarViewWeek),
+    BottomTab("Today", Icons.Outlined.CheckCircle),
     BottomTab("All Time", Icons.Outlined.BarChart),
 )
 
@@ -83,13 +90,26 @@ class MainActivity : ComponentActivity() {
         // behaviour here for OpenApp so the result is identical regardless of
         // which entry point the system picked.
         completeHabitFromIntent(intent)
+
+        // Make sure the notification channel exists and the user's chosen
+        // reminder schedule is in place. Cheap and safe to call on every
+        // cold launch — if reminders are disabled it just cancels alarms.
+        dev.matejgroombridge.habittracker.notifications.Notifications.ensureChannel(this)
+        lifecycleScope.launch {
+            dev.matejgroombridge.habittracker.notifications
+                .ReminderScheduler.rescheduleAll(applicationContext)
+        }
+
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.factory(application),
             )
             val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
 
-            dev.matejgroombridge.habittracker.ui.theme.AppTheme(themeMode = settings.themeMode) {
+            dev.matejgroombridge.habittracker.ui.theme.AppTheme(
+                themeMode = settings.themeMode,
+                amoled = settings.amoled,
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -151,16 +171,33 @@ private fun AppShell(settingsViewModel: SettingsViewModel) {
                 settingsViewModel = settingsViewModel,
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenArchive = { navController.navigate(Routes.ARCHIVE) },
+                onOpenWriteNfc = { navController.navigate(Routes.WRITE_NFC) },
             )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 viewModel = settingsViewModel,
+                homeViewModel = homeViewModel,
                 onBack = { navController.popBackStack() },
+                onOpenReorder = { navController.navigate(Routes.REORDER) },
+                onOpenArchive = { navController.navigate(Routes.ARCHIVE) },
+                onOpenWriteNfc = { navController.navigate(Routes.WRITE_NFC) },
             )
         }
         composable(Routes.ARCHIVE) {
             ArchivedHabitsScreen(
+                viewModel = homeViewModel,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.REORDER) {
+            ReorderHabitsScreen(
+                viewModel = homeViewModel,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.WRITE_NFC) {
+            dev.matejgroombridge.habittracker.ui.screens.WriteNfcTagScreen(
                 viewModel = homeViewModel,
                 onBack = { navController.popBackStack() },
             )
@@ -184,9 +221,25 @@ private fun MainPager(
     settingsViewModel: SettingsViewModel,
     onOpenSettings: () -> Unit,
     onOpenArchive: () -> Unit,
+    onOpenWriteNfc: () -> Unit,
 ) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { BOTTOM_TABS.size })
+    val pagerState = rememberPagerState(
+        initialPage = TODAY_PAGE_INDEX,
+        pageCount = { BOTTOM_TABS.size },
+    )
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+
+    // Light buzz whenever the pager actually settles on a new page (whether
+    // initiated by a swipe or a tab tap). We snapshot the previous page so
+    // the initial composition (page == initialPage) doesn't fire a buzz.
+    var lastPage by remember { mutableStateOf(pagerState.currentPage) }
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != lastPage) {
+            haptics.light()
+            lastPage = pagerState.currentPage
+        }
+    }
 
     // Driving the FAB from the shell so it sits above the bottom bar correctly.
     var requestCreate by remember { mutableStateOf(false) }
@@ -203,7 +256,14 @@ private fun MainPager(
                         selected = selected,
                         onClick = {
                             if (!selected) {
+                                // The page-change LaunchedEffect above will
+                                // emit the haptic once the pager settles —
+                                // no need to duplicate here.
                                 scope.launch { pagerState.animateScrollToPage(index) }
+                            } else {
+                                // Tapping the already-selected tab still
+                                // gives a small confirmation tick.
+                                haptics.light()
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
@@ -213,8 +273,13 @@ private fun MainPager(
             }
         },
         floatingActionButton = {
-            if (pagerState.currentPage == 0) {
-                FloatingActionButton(onClick = { requestCreate = true }) {
+            if (pagerState.currentPage == TODAY_PAGE_INDEX) {
+                FloatingActionButton(
+                    onClick = {
+                        haptics.completion()
+                        requestCreate = true
+                    },
+                ) {
                     Icon(Icons.Outlined.Add, contentDescription = "Add habit")
                 }
             }
@@ -229,18 +294,19 @@ private fun MainPager(
             beyondViewportPageCount = 1,
         ) { page ->
             when (page) {
-                0 -> HomeScreen(
+                0 -> PastWeekScreen(
+                    viewModel = homeViewModel,
+                    contentPadding = padding,
+                )
+                TODAY_PAGE_INDEX -> HomeScreen(
                     viewModel = homeViewModel,
                     settingsViewModel = settingsViewModel,
                     onOpenSettings = onOpenSettings,
                     onOpenArchive = onOpenArchive,
+                    onOpenWriteNfc = onOpenWriteNfc,
                     contentPadding = padding,
                     requestCreate = requestCreate,
                     onCreateDialogConsumed = { requestCreate = false },
-                )
-                1 -> PastWeekScreen(
-                    viewModel = homeViewModel,
-                    contentPadding = padding,
                 )
                 2 -> AnalyticsScreen(
                     viewModel = homeViewModel,
@@ -250,10 +316,10 @@ private fun MainPager(
         }
     }
 
-    // Defensive: if a non-Home page is somehow showing while a create
+    // Defensive: if a non-Today page is somehow showing while a create
     // request is pending (e.g. swipe just after tapping FAB), drop it so
     // we never auto-open the editor on the wrong page.
     LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage != 0 && requestCreate) requestCreate = false
+        if (pagerState.currentPage != TODAY_PAGE_INDEX && requestCreate) requestCreate = false
     }
 }

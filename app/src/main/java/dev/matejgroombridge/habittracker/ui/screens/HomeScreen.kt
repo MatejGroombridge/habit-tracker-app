@@ -40,10 +40,14 @@ import dev.matejgroombridge.habittracker.ui.components.ConfettiOverlay
 import dev.matejgroombridge.habittracker.ui.components.HabitCard
 import dev.matejgroombridge.habittracker.ui.components.HabitEditorDialog
 import dev.matejgroombridge.habittracker.ui.components.HabitEditorResult
+import dev.matejgroombridge.habittracker.ui.components.HabitOverviewDialog
 
 /** Which dialog (if any) the home screen is currently showing. */
 private sealed interface HomeDialog {
     data object Create : HomeDialog
+    /** Read-only snapshot of stats — opened by long-pressing a card. */
+    data class Overview(val habit: Habit) : HomeDialog
+    /** Full editor — reachable from [Overview]'s edit button or by other entry points. */
     data class Edit(val habit: Habit) : HomeDialog
 }
 
@@ -54,11 +58,18 @@ fun HomeScreen(
     settingsViewModel: SettingsViewModel,
     onOpenSettings: () -> Unit,
     onOpenArchive: () -> Unit,
+    /**
+     * Navigate to the in-app NFC writer. Passed through to
+     * [HabitEditorDialog]'s NFC card. Optional — defaults to a no-op so
+     * existing tests/previews don't break.
+     */
+    onOpenWriteNfc: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     requestCreate: Boolean = false,
     onCreateDialogConsumed: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<HomeDialog?>(null) }
 
     LaunchedEffect(requestCreate) {
@@ -73,7 +84,7 @@ fun HomeScreen(
     // (not the initial state), so opening the app on an already-complete day
     // doesn't trigger a redundant burst.
     val allComplete = state.activeHabits.isNotEmpty() &&
-        state.activeHabits.all { it.isVisuallyCompletedOn(state.todayEpochDay) }
+        state.activeHabits.all { it.isVisuallyCompletedOn(state.todayEpochDay, settings.weekStart.dayOfWeek) }
     var previousAllComplete by remember { mutableStateOf<Boolean?>(null) }
     var fireConfetti by remember { mutableStateOf(false) }
     LaunchedEffect(allComplete) {
@@ -111,7 +122,8 @@ fun HomeScreen(
                         todayEpochDay = state.todayEpochDay,
                         bottomPadding = contentPadding.calculateBottomPadding() + 24.dp,
                         onToggle = viewModel::toggleToday,
-                        onLongPress = { habit -> dialog = HomeDialog.Edit(habit) },
+                        onLongPress = { habit -> dialog = HomeDialog.Overview(habit) },
+                        weekStart = settings.weekStart,
                     )
                 }
             }
@@ -136,9 +148,41 @@ fun HomeScreen(
                 dialog = null
             },
         )
+        is HomeDialog.Overview -> {
+            // Source the latest version of the habit from state so stats
+            // stay live if completion changes (e.g. via NFC) while the
+            // dialog is open.
+            val live = state.activeHabits.firstOrNull { it.id == d.habit.id } ?: d.habit
+            HabitOverviewDialog(
+                habit = live,
+                todayEpochDay = state.todayEpochDay,
+                onDismiss = { dialog = null },
+                onEdit = { dialog = HomeDialog.Edit(live) },
+                onToggleSkipToday = {
+                    viewModel.setSkipped(
+                        habitId = live.id,
+                        epochDay = state.todayEpochDay,
+                        skipped = !live.isSkippedOn(state.todayEpochDay),
+                    )
+                },
+                onTogglePause = {
+                    viewModel.setPaused(habitId = live.id, paused = !live.isPaused)
+                },
+                // Only show the per-habit reminder toggle when global
+                // reminders are on — otherwise it has no effect.
+                showRemindersToggle = settings.reminders.enabled,
+                onToggleIncludeInReminders = {
+                    viewModel.setIncludeInReminders(live.id, !live.includeInReminders)
+                },
+            )
+        }
         is HomeDialog.Edit -> HabitEditorDialog(
             existing = d.habit,
             onDismiss = { dialog = null },
+            onWriteNfc = {
+                dialog = null
+                onOpenWriteNfc()
+            },
             onResult = { result ->
                 when (result) {
                     is HabitEditorResult.Save -> viewModel.updateHabit(
@@ -214,6 +258,7 @@ private fun HabitsGrid(
     bottomPadding: androidx.compose.ui.unit.Dp,
     onToggle: (String) -> Unit,
     onLongPress: (Habit) -> Unit,
+    weekStart: dev.matejgroombridge.habittracker.data.settings.WeekStart,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -233,6 +278,7 @@ private fun HabitsGrid(
                 todayEpochDay = todayEpochDay,
                 onClick = { onToggle(habit.id) },
                 onLongClick = { onLongPress(habit) },
+                weekStart = weekStart,
             )
         }
     }

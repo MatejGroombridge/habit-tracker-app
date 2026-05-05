@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,10 +33,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.data.model.HabitFrequency
+import dev.matejgroombridge.habittracker.data.settings.WeekStart
 import dev.matejgroombridge.habittracker.ui.theme.HabitColors
 import dev.matejgroombridge.habittracker.ui.theme.HabitIcons
 import dev.matejgroombridge.habittracker.ui.theme.containerColor
 import dev.matejgroombridge.habittracker.ui.theme.contentColor
+import dev.matejgroombridge.habittracker.ui.util.rememberHaptics
 
 /**
  * One habit tile. Background uses the habit's chosen pastel colour; the icon
@@ -51,9 +56,11 @@ fun HabitCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    weekStart: WeekStart = WeekStart.Default,
 ) {
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
+    val haptics = rememberHaptics()
 
     val markedToday = habit.isCompletedOn(todayEpochDay)
     val visuallyCompleted = habit.isVisuallyCompletedOn(todayEpochDay)
@@ -79,8 +86,14 @@ fun HabitCard(
             .fillMaxWidth()
             .combinedClickable(
                 role = Role.Button,
-                onClick = onClick,
-                onLongClick = onLongClick,
+                onClick = {
+                    haptics.completion()
+                    onClick()
+                },
+                onLongClick = {
+                    haptics.longPress()
+                    onLongClick()
+                },
             ),
     ) {
         Row(
@@ -106,16 +119,14 @@ fun HabitCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val subtitle = subtitleFor(habit, todayEpochDay, markedToday, visuallyCompleted)
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = baseContent.copy(alpha = 0.75f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                HabitSubtitle(
+                    habit = habit,
+                    today = todayEpochDay,
+                    markedToday = markedToday,
+                    visuallyCompleted = visuallyCompleted,
+                    color = baseContent.copy(alpha = 0.75f),
+                    weekStart = weekStart,
+                )
             }
         }
     }
@@ -145,25 +156,122 @@ private fun HabitIconTile(
     }
 }
 
-private fun subtitleFor(
+/**
+ * Renders the small text under the habit name. For interval habits that are
+ * "still ticked because they were completed earlier in the window", we
+ * previously showed `Resets in N day(s)` — but the narrow card width meant
+ * the longer strings were cut off. Now we render a compact "🔄 N" pill
+ * instead, which fits in any card width.
+ */
+@Composable
+private fun HabitSubtitle(
     habit: Habit,
     today: Long,
     markedToday: Boolean,
     visuallyCompleted: Boolean,
-): String? = when (val f = habit.frequency) {
-    HabitFrequency.Daily -> null
-    HabitFrequency.Weekly ->
-        if (visuallyCompleted && !markedToday) "Done this week" else "Weekly"
-    is HabitFrequency.EveryNDays -> when {
-        visuallyCompleted && !markedToday -> {
-            val mostRecent = habit.completedDays.filter { it < today }.maxOrNull()
-            if (mostRecent != null) {
-                val daysLeft = (f.days - (today - mostRecent)).toInt().coerceAtLeast(0)
-                if (daysLeft > 0) "Resets in $daysLeft day${if (daysLeft == 1) "" else "s"}"
-                else "Due today"
-            } else "Every ${f.days} days"
+    color: Color,
+    weekStart: WeekStart,
+) {
+    when (val f = habit.frequency) {
+        HabitFrequency.Daily -> Unit
+        HabitFrequency.Weekly -> {
+            val text = if (visuallyCompleted && !markedToday) "Done this week" else "Weekly"
+            SubtitleText(text, color)
         }
-        else -> if (f.days == 1) null else "Every ${f.days} days"
+        is HabitFrequency.EveryNDays -> {
+            val isResting = visuallyCompleted && !markedToday
+            if (isResting) {
+                val mostRecent = habit.completedDays.filter { it < today }.maxOrNull()
+                if (mostRecent != null) {
+                    val daysLeft = (f.days - (today - mostRecent)).toInt().coerceAtLeast(0)
+                    if (daysLeft > 0) {
+                        ResetCountdown(daysLeft = daysLeft, color = color)
+                    } else {
+                        SubtitleText("Due today", color)
+                    }
+                } else {
+                    SubtitleText("Every ${f.days} days", color)
+                }
+            } else if (f.days != 1) {
+                SubtitleText("Every ${f.days} days", color)
+            }
+        }
+        is HabitFrequency.TimesPerWeek -> {
+            // Count completions in the current week (start day comes from
+            // user settings via [weekStart] — see WeekMath.weekRange).
+            // Renders as a calendar icon followed by the live count, so
+            // the card subtitle stays compact and visually distinct from
+            // the "in N days" reset countdown.
+            val (startEpoch, endEpoch) = WeekMath.weekRange(today, weekStart)
+            val countThisWeek = habit.completedDays.count { it in startEpoch..endEpoch }
+            if (countThisWeek >= f.times) {
+                SubtitleText("Done for the week", color)
+            } else {
+                WeeklyProgress(count = countThisWeek, target = f.times, color = color)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeeklyProgress(count: Int, target: Int, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CalendarMonth,
+            contentDescription = "$count of $target this week",
+            tint = color,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            text = "$count of $target",
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun SubtitleText(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/**
+ * Compact "reset in N days" indicator: a small refresh glyph followed by the
+ * number of remaining days. Replaces the older text-only "Resets in N day(s)"
+ * label which got truncated on narrow cards.
+ */
+@Composable
+private fun ResetCountdown(daysLeft: Int, color: Color) {
+    val unit = if (daysLeft == 1) "day" else "days"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Refresh,
+            contentDescription = "Resets in $daysLeft $unit",
+            tint = color,
+            modifier = Modifier.size(14.dp),
+        )
+        // Reads as "[reset icon] in 3 days" — the prefix "in" makes the
+        // countdown unambiguous; bare "[icon] 3" was easy to misread as a
+        // count of resets rather than a duration.
+        Text(
+            text = "in $daysLeft $unit",
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            maxLines = 1,
+        )
     }
 }
 

@@ -1,0 +1,36 @@
+{
+    "logs": [
+        {
+            "outputFile": "dev.matejgroombridge.habittracker.app-mergeDebugResources-64:/values-v23/values-v23.xml",
+            "map": [
+                {
+                    "source": "/Users/mgroombridge/.gradle/caches/9.0.0/transforms/e993e9231a6935efbfc74f956f90a1c2/transformed/work-runtime-2.7.1/res/values-v23/values-v23.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,121",
+                        "endColumns": "65,62",
+                        "endOffsets": "116,179"
+                    }
+                },
+                {
+                    "source": "/Users/mgroombridge/.gradle/caches/9.0.0/transforms/90d273b6214d350818f04739b80bcbfb/transformed/glance-appwidget-1.1.1/res/values-v23/values-v23.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "55",
+                        "endOffsets": "106"
+                    },
+                    "to": {
+                        "startLines": "4",
+                        "startColumns": "4",
+                        "startOffsets": "184",
+                        "endColumns": "55",
+                        "endOffsets": "235"
+                    }
+                }
+            ]
+        }
+    ]
+}

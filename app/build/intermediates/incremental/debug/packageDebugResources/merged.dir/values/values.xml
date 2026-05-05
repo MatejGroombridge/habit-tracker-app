@@ -3,6 +3,7 @@
     <color name="ic_launcher_background">#1B1B1F</color>
     <color name="splash_background">#1B1B1F</color>
     <string name="app_name">Habit Tracker</string>
+    <string name="widget_description">Quick-complete up to 6 habits from your home screen.</string>
     <style name="Theme.App" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="postSplashScreenTheme">@style/Theme.App.Main</item>

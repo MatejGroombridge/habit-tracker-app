@@ -36,12 +36,23 @@ sealed interface HabitFrequency {
         init { require(days >= 1) { "EveryNDays requires days >= 1, got $days" } }
     }
 
+    /**
+     * Should be completed [times] times within an ISO week (Mon → Sun). The
+     * habit reads as "done for the week" once that many completions land in
+     * the current week. `times` is clamped to 1..7.
+     */
+    @Serializable
+    data class TimesPerWeek(val times: Int) : HabitFrequency {
+        init { require(times in 1..7) { "TimesPerWeek requires times in 1..7, got $times" } }
+    }
+
     companion object {
-        /** Human-readable summary, e.g. "Daily", "Weekly", "Every 3 days". */
+        /** Human-readable summary, e.g. "Daily", "Weekly", "Every 3 days", "3× per week". */
         fun describe(frequency: HabitFrequency): String = when (frequency) {
             Daily -> "Daily"
             Weekly -> "Weekly"
             is EveryNDays -> if (frequency.days == 1) "Daily" else "Every ${frequency.days} days"
+            is TimesPerWeek -> "${frequency.times}× per week"
         }
     }
 }

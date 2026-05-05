@@ -3,11 +3,14 @@ local
 color ic_launcher_background
 color splash_background
 drawable ic_launcher_foreground
+drawable ic_widget_info
 mipmap ic_launcher
 mipmap ic_launcher_round
 string app_name
+string widget_description
 style Theme.App
 style Theme.App.Main
 style Theme.App.Transparent
 xml backup_rules
 xml data_extraction_rules
+xml habit_widget_info

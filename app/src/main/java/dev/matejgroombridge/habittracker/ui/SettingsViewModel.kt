@@ -1,6 +1,7 @@
 package dev.matejgroombridge.habittracker.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.matejgroombridge.habittracker.data.settings.NfcAction
 import dev.matejgroombridge.habittracker.data.settings.Settings
 import dev.matejgroombridge.habittracker.data.settings.SettingsRepository
+import dev.matejgroombridge.habittracker.data.settings.WeekStart
+import dev.matejgroombridge.habittracker.notifications.ReminderScheduler
 import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
+    private val appContext: Context,
     private val repository: SettingsRepository,
 ) : ViewModel() {
 
@@ -29,14 +33,51 @@ class SettingsViewModel(
         viewModelScope.launch { repository.setThemeMode(mode) }
     }
 
+    fun setAmoled(enabled: Boolean) {
+        viewModelScope.launch { repository.setAmoled(enabled) }
+    }
+
     fun setNfcAction(action: NfcAction) {
         viewModelScope.launch { repository.setNfcAction(action) }
+    }
+
+    fun setWeekStart(weekStart: WeekStart) {
+        viewModelScope.launch { repository.setWeekStart(weekStart) }
+    }
+
+    fun setReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setReminderEnabled(enabled)
+            ReminderScheduler.rescheduleAll(appContext)
+        }
+    }
+
+    fun setReminderTimesPerDay(times: Int) {
+        viewModelScope.launch {
+            repository.setReminderTimesPerDay(times)
+            ReminderScheduler.rescheduleAll(appContext)
+        }
+    }
+
+    fun setReminderFirstTime(time: String) {
+        viewModelScope.launch {
+            repository.setReminderFirstTime(time)
+            ReminderScheduler.rescheduleAll(appContext)
+        }
+    }
+
+    fun setReminderLastTime(time: String) {
+        viewModelScope.launch {
+            repository.setReminderLastTime(time)
+            ReminderScheduler.rescheduleAll(appContext)
+        }
     }
 
     companion object {
         fun factory(application: Application): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                SettingsViewModel(SettingsRepository(application.applicationContext))
+                val ctx = application.applicationContext
+                SettingsViewModel(ctx, SettingsRepository(ctx))
             }
         }
     }

@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -94,6 +95,13 @@ fun HabitEditorDialog(
     existing: Habit?,
     onDismiss: () -> Unit,
     onResult: (HabitEditorResult) -> Unit,
+    /**
+     * Called when the user taps the "Write Tag" button on the NFC card.
+     * The host is responsible for navigating to the NFC writer screen
+     * (and optionally pre-selecting this habit). Pass null in create mode
+     * — the NFC card is hidden until the habit has an id.
+     */
+    onWriteNfc: (() -> Unit)? = null,
 ) {
     val isEdit = existing != null
 
@@ -111,12 +119,18 @@ fun HabitEditorDialog(
                 HabitFrequency.Daily -> FrequencyKind.Daily
                 HabitFrequency.Weekly -> FrequencyKind.Weekly
                 is HabitFrequency.EveryNDays -> FrequencyKind.EveryN
+                is HabitFrequency.TimesPerWeek -> FrequencyKind.TimesPerWeek
             }
         )
     }
     var intervalDays by remember {
         mutableIntStateOf(
             (initialFrequency as? HabitFrequency.EveryNDays)?.days ?: 3
+        )
+    }
+    var timesPerWeek by remember {
+        mutableIntStateOf(
+            (initialFrequency as? HabitFrequency.TimesPerWeek)?.times ?: 3
         )
     }
 
@@ -130,6 +144,7 @@ fun HabitEditorDialog(
             FrequencyKind.Daily -> HabitFrequency.Daily
             FrequencyKind.Weekly -> HabitFrequency.Weekly
             FrequencyKind.EveryN -> HabitFrequency.EveryNDays(intervalDays.coerceAtLeast(1))
+            FrequencyKind.TimesPerWeek -> HabitFrequency.TimesPerWeek(timesPerWeek.coerceIn(1, 7))
         }
         onResult(
             HabitEditorResult.Save(
@@ -168,69 +183,74 @@ fun HabitEditorDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 520.dp)
+                    .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                // 14dp gives a comfortable rhythm between the title row,
-                // description field, frequency picker, and NFC link without
-                // the awkward "is this a new section or just whitespace?"
-                // gaps a larger value created. Section headers contribute
-                // no padding of their own — see SectionLabel{,WithHelp}.
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                // Tighter rhythm — captions sit just above their cards
+                // with 4dp inside CaptionedSection, and 12dp between
+                // sections. Reads as a single tidy column rather than
+                // separated islands.
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IconBadge(
-                        iconKey = iconKey,
-                        colorKey = colorKey,
-                        onClick = { showIconPicker = true },
-                    )
+                // --- Identity card: icon + title + description ---
+                EditorSection(padding = 12.dp) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        IconBadge(
+                            iconKey = iconKey,
+                            colorKey = colorKey,
+                            onClick = { showIconPicker = true },
+                        )
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Title") },
+                            placeholder = { Text("e.g. Drink water") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Title") },
-                        placeholder = { Text("e.g. Drink water") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 1,
+                        maxLines = 3,
                     )
                 }
 
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description (optional)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp),
-                    minLines = 1,
-                    maxLines = 3,
-                )
-
-                // Each section header is grouped with its content in a
-                // tight Column so the gap between label and control is
-                // visibly smaller (4dp) than the gap between sections
-                // (the parent's 14dp spacedBy).
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionLabel("Frequency")
+                // --- Frequency card ---
+                CaptionedSection(caption = "Frequency") {
                     FrequencyPicker(
                         kind = frequencyKind,
                         onKindChange = { frequencyKind = it },
                         intervalDays = intervalDays,
                         onIntervalChange = { intervalDays = it.coerceIn(1, 30) },
+                        timesPerWeek = timesPerWeek,
+                        onTimesPerWeekChange = { timesPerWeek = it.coerceIn(1, 7) },
                     )
                 }
 
+                // --- NFC actions card (edit mode only). Replaces the URL
+                // display with three explicit verbs — copy / share / write
+                // tag — so the dialog stays compact and the user never
+                // sees a long bare-URL string. -----------------------
                 if (existing != null) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionLabelWithHelp(
-                            text = "NFC Tag Link",
-                            helpText = "Write this URL to an NFC tag with any tag-writer " +
-                                "app. Scanning the tag will complete this habit. " +
-                                "What happens on scan (background / overlay / open the " +
-                                "app) is set in Settings → NFC.",
+                    CaptionedSection(
+                        caption = "NFC tag",
+                        helpText = "Use this habit's link to fire a quick-complete from " +
+                            "an NFC tag. Copy or share to write it with another app, " +
+                            "or use Write Tag to scan and write directly. What " +
+                            "happens on scan is set in Settings → NFC.",
+                    ) {
+                        NfcActionRow(
+                            url = existing.nfcUrl,
+                            habitName = existing.name,
+                            onWriteTag = onWriteNfc,
                         )
-                        NfcLinkRow(url = existing.nfcUrl, habitName = existing.name)
                     }
                 }
             }
@@ -256,7 +276,107 @@ fun HabitEditorDialog(
     }
 }
 
-private enum class FrequencyKind { Daily, Weekly, EveryN }
+private enum class FrequencyKind { Daily, Weekly, TimesPerWeek, EveryN }
+
+/**
+ * Compact help "?" icon. Tapping opens a small popover containing
+ * [helpText]. Sized to sit flush with caption text without inflating
+ * its row height.
+ */
+@Composable
+private fun HelpIcon(helpText: String) {
+    var showHelp by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .clickable { showHelp = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                contentDescription = "What's this?",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+        if (showHelp) {
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopStart,
+                onDismissRequest = { showHelp = false },
+                properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .padding(top = 24.dp)
+                        .widthIn(max = 280.dp),
+                ) {
+                    Text(
+                        text = helpText,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Rounded container that groups related controls — the editor equivalent
+ * of [SettingsCard]. Keeps padding consistent across cards and makes it
+ * easy to add new sections later.
+ */
+@Composable
+private fun EditorSection(
+    padding: androidx.compose.ui.unit.Dp = 14.dp,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(padding)) { content() }
+    }
+}
+
+/**
+ * Caption (uppercased) + a help icon, then the contained card. Tight 4dp
+ * spacing between caption and card so they read as a unit, with no padding
+ * around the caption itself — the parent Column controls inter-section
+ * spacing.
+ */
+@Composable
+private fun CaptionedSection(
+    caption: String,
+    helpText: String? = null,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 6.dp),
+        ) {
+            Text(
+                text = caption.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (helpText != null) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon(helpText = helpText)
+            }
+        }
+        EditorSection(padding = 12.dp) { content() }
+    }
+}
 
 @Composable
 private fun SectionLabel(text: String) {
@@ -380,34 +500,55 @@ private fun IconGrid(selectedKey: String, accent: Color, onSelected: (String) ->
     }
 }
 
+/**
+ * 2×2 grid of equally-sized cards for the four frequency kinds, with a
+ * stepper appearing below for the two kinds that take a number. The grid
+ * layout means each card has predictable visual weight regardless of
+ * label length, fixing the awkward "Daily is tiny, Custom is huge" look
+ * the FlowRow chips had before.
+ */
 @Composable
 private fun FrequencyPicker(
     kind: FrequencyKind,
     onKindChange: (FrequencyKind) -> Unit,
     intervalDays: Int,
     onIntervalChange: (Int) -> Unit,
+    timesPerWeek: Int,
+    onTimesPerWeekChange: (Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Row 1 — Daily, Weekly
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
+            FrequencyOption(
+                label = "Daily",
                 selected = kind == FrequencyKind.Daily,
                 onClick = { onKindChange(FrequencyKind.Daily) },
-                label = { Text("Daily") },
+                modifier = Modifier.weight(1f),
             )
-            FilterChip(
+            FrequencyOption(
+                label = "Weekly",
                 selected = kind == FrequencyKind.Weekly,
                 onClick = { onKindChange(FrequencyKind.Weekly) },
-                label = { Text("Weekly") },
-            )
-            FilterChip(
-                selected = kind == FrequencyKind.EveryN,
-                onClick = { onKindChange(FrequencyKind.EveryN) },
-                label = { Text("Custom") },
+                modifier = Modifier.weight(1f),
             )
         }
-        if (kind == FrequencyKind.EveryN) {
-            // Compact pill-shaped stepper centred under the chips.
-            Row(
+        // Row 2 — Times per week, Every N days
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FrequencyOption(
+                label = "Times per week",
+                selected = kind == FrequencyKind.TimesPerWeek,
+                onClick = { onKindChange(FrequencyKind.TimesPerWeek) },
+                modifier = Modifier.weight(1f),
+            )
+            FrequencyOption(
+                label = "Every N days",
+                selected = kind == FrequencyKind.EveryN,
+                onClick = { onKindChange(FrequencyKind.EveryN) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        when (kind) {
+            FrequencyKind.EveryN -> Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -415,15 +556,71 @@ private fun FrequencyPicker(
                 CompactStepper(
                     value = intervalDays,
                     onChange = onIntervalChange,
-                    suffix = if (intervalDays == 1) "day" else "days",
+                    label = { v -> "Every $v ${if (v == 1) "day" else "days"}" },
                 )
             }
+            FrequencyKind.TimesPerWeek -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CompactStepper(
+                    value = timesPerWeek,
+                    onChange = { onTimesPerWeekChange(it.coerceIn(1, 7)) },
+                    label = { v -> "$v ${if (v == 1) "time" else "times"} per week" },
+                )
+            }
+            else -> Unit
+        }
+    }
+}
+
+/**
+ * One cell in the 2×2 frequency grid. Tinted accent when selected; plain
+ * surface when not. Sized via the parent Row's `Modifier.weight(1f)` so
+ * all four cells are visually identical regardless of label length.
+ */
+@Composable
+private fun FrequencyOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bg = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.surfaceContainerHigh
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary
+    else MaterialTheme.colorScheme.onSurface
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = bg,
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = fg,
+                maxLines = 1,
+            )
         }
     }
 }
 
 @Composable
-private fun CompactStepper(value: Int, onChange: (Int) -> Unit, suffix: String) {
+private fun CompactStepper(
+    value: Int,
+    onChange: (Int) -> Unit,
+    label: (Int) -> String,
+) {
     val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
@@ -440,7 +637,7 @@ private fun CompactStepper(value: Int, onChange: (Int) -> Unit, suffix: String) 
         )
         Spacer(Modifier.width(4.dp))
         Text(
-            text = "Every $value $suffix",
+            text = label(value),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 10.dp),
@@ -485,49 +682,89 @@ private fun StepperButton(
 }
 
 /**
- * Read-only display of the habit's NFC URL, with copy and share buttons.
+ * Three pill-shaped actions for the habit's NFC URL — Copy, Share, Write.
  *
- * The user pastes this URL into any NFC-writer app and writes it to a tag.
- * Tapping the tag triggers `NfcCompletionActivity`, which marks the habit
- * complete and runs the action chosen in Settings.
+ * Replaces the old "show the URL + two icon buttons" row. Most users only
+ * ever need the verbs (the URL itself is implementation detail), so we
+ * omit it from the visible UI to keep the dialog short and uncluttered.
+ *
+ *  * **Copy** — copies the URL to the system clipboard.
+ *  * **Share** — opens the system share sheet so the user can paste it
+ *    into a tag-writer app of their choosing.
+ *  * **Write Tag** — navigates to the in-app NFC writer (only available
+ *    when [onWriteTag] is non-null).
  */
 @Composable
-private fun NfcLinkRow(url: String, habitName: String) {
+private fun NfcActionRow(
+    url: String,
+    habitName: String,
+    onWriteTag: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Nfc,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = url,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
+        NfcAction(
+            label = "Copy",
+            icon = Icons.Outlined.ContentCopy,
             modifier = Modifier.weight(1f),
-            maxLines = 2,
+            onClick = { copyToClipboard(context, url) },
         )
-        IconButton(onClick = { copyToClipboard(context, url) }) {
-            Icon(
-                imageVector = Icons.Outlined.ContentCopy,
-                contentDescription = "Copy NFC link",
-                modifier = Modifier.size(20.dp),
+        NfcAction(
+            label = "Share",
+            icon = Icons.Outlined.Share,
+            modifier = Modifier.weight(1f),
+            onClick = { shareUrl(context, url, habitName) },
+        )
+        if (onWriteTag != null) {
+            NfcAction(
+                label = "Write Tag",
+                icon = Icons.Outlined.Nfc,
+                modifier = Modifier.weight(1f),
+                onClick = onWriteTag,
             )
         }
-        IconButton(onClick = { shareUrl(context, url, habitName) }) {
+    }
+}
+
+/**
+ * One of the three NFC verbs. Pill-style with stacked icon + label so all
+ * three line up at the same height regardless of label length.
+ */
+@Composable
+private fun NfcAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Icon(
-                imageVector = Icons.Outlined.Share,
-                contentDescription = "Share NFC link",
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
             )
         }
     }

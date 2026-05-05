@@ -35,8 +35,32 @@ data class Habit(
     val archived: Boolean = false,
     val createdAtEpochDay: Long,
     val completedDays: Set<Long> = emptySet(),
+    /**
+     * How many "skips" the user is allowed per week before a missed day
+     * counts against their streak. 0 = no skips allowed (legacy behaviour).
+     * Stored on the habit so different habits can have different
+     * tolerances ("workout: 1 skip", "meditate: 0 skips", etc.).
+     */
+    val skipsPerWeek: Int = 0,
+    /** Days the user has explicitly marked as a "skip" (not missed, not done). */
+    val skippedDays: Set<Long> = emptySet(),
+    /**
+     * When non-null, the habit is paused and shouldn't count for streaks
+     * or the analytics grid. Value is the epoch-day on which the pause
+     * began; `null` = active.
+     */
+    val pausedSinceEpochDay: Long? = null,
+    /**
+     * Whether this habit appears in the daily reminder notification.
+     * Defaults to true so legacy habits keep their existing behaviour.
+     * Toggle off for habits the user already remembers without prompting,
+     * or doesn't want to be nagged about.
+     */
+    val includeInReminders: Boolean = true,
 ) {
     fun isCompletedOn(epochDay: Long): Boolean = epochDay in completedDays
+    fun isSkippedOn(epochDay: Long): Boolean = epochDay in skippedDays
+    val isPaused: Boolean get() = pausedSinceEpochDay != null
 
     /** Returns a copy with [epochDay] toggled in [completedDays]. */
     fun toggleCompletion(epochDay: Long): Habit {
@@ -94,12 +118,32 @@ data class Habit(
      * for a 3-day cadence will keep its checked styling on Tuesday and
      * Wednesday too.
      */
-    fun isVisuallyCompletedOn(day: Long): Boolean {
+    fun isVisuallyCompletedOn(
+        day: Long,
+        weekStart: java.time.DayOfWeek = java.time.DayOfWeek.MONDAY,
+    ): Boolean {
+        // Skipped or paused days behave the same as completed in the
+        // "should this card look done?" sense — the user has explicitly
+        // resolved the habit for the day, so it shouldn't sit there as
+        // an outstanding TODO. The All-Time grid still shows them as
+        // skip-circles / pause-cells (those use isCompletedOn directly).
+        if (day in skippedDays) return true
+        if (pausedSinceEpochDay != null && day >= pausedSinceEpochDay) return true
         if (day in completedDays) return true
         val window = when (val f = frequency) {
             HabitFrequency.Daily -> return false
             HabitFrequency.Weekly -> 7
             is HabitFrequency.EveryNDays -> f.days
+            is HabitFrequency.TimesPerWeek -> {
+                // "Done for the week" once we've hit the target — check the
+                // user-week (start day comes from settings) containing `day`.
+                val date = java.time.LocalDate.ofEpochDay(day)
+                val daysSinceStart = ((date.dayOfWeek.value - weekStart.value) % 7 + 7) % 7
+                val startEpoch = day - daysSinceStart
+                val endEpoch = startEpoch + 6
+                val countThisWeek = completedDays.count { it in startEpoch..endEpoch }
+                return countThisWeek >= f.times
+            }
         }
         if (window <= 1) return false
         // Find the most recent completion strictly before `day` and check

@@ -117,4 +117,9 @@ dependencies {
     // Persistence
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
+
+    // Home-screen widget — Glance lets us render the widget with a
+    // Compose-style API instead of hand-rolling RemoteViews.
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 }

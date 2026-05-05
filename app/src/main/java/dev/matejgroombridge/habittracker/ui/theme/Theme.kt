@@ -11,6 +11,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -33,6 +34,7 @@ private val FallbackLightScheme: ColorScheme = lightColorScheme()
 @Composable
 fun AppTheme(
     themeMode: ThemeMode = ThemeMode.System,
+    amoled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isDark = when (themeMode) {
@@ -42,12 +44,28 @@ fun AppTheme(
     }
 
     val context = LocalContext.current
-    val colorScheme: ColorScheme = when {
+    val baseScheme: ColorScheme = when {
         supportsDynamicColor && isDark  -> dynamicDarkColorScheme(context)
         supportsDynamicColor && !isDark -> dynamicLightColorScheme(context)
         isDark                          -> FallbackDarkScheme
         else                            -> FallbackLightScheme
     }
+
+    // AMOLED: when in dark mode, force background / surface tones to true
+    // black so OLED screens can switch those pixels off entirely. We keep
+    // the dynamic accent / primary colours intact so the UI doesn't lose
+    // its personality.
+    val colorScheme: ColorScheme = if (amoled && isDark) {
+        baseScheme.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color(0xFF0A0A0A),
+            surfaceContainer = Color(0xFF111111),
+            surfaceContainerHigh = Color(0xFF161616),
+            surfaceContainerHighest = Color(0xFF1C1C1C),
+        )
+    } else baseScheme
 
     val view = LocalView.current
     if (!view.isInEditMode) {
