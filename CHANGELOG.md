@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v1.0.1 — 2026-05-05
+
+Implemented swipe to navigate between pages
+
+
 ## v1.0.0 — 2026-05-05
 
 Major UI improvements, bugfixes and feature completion
