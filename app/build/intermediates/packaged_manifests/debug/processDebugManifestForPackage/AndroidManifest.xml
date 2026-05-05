@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.matejgroombridge.habittracker.debug"
-    android:versionCode="5"
-    android:versionName="0.4.0-debug" >
+    android:versionCode="6"
+    android:versionName="1.0.0-debug" >
 
     <uses-sdk
         android:minSdkVersion="26"
