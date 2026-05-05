@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.matejgroombridge.habittracker.BuildConfig
 import dev.matejgroombridge.habittracker.R
+import dev.matejgroombridge.habittracker.data.settings.NfcAction
 import dev.matejgroombridge.habittracker.ui.SettingsViewModel
 import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
 
@@ -86,6 +87,31 @@ fun SettingsScreen(
                         FilterChip(
                             selected = settings.themeMode == mode,
                             onClick = { viewModel.setThemeMode(mode) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
+            Section("NFC") {
+                Text(
+                    text = "When You Scan a Tag",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(12.dp))
+                // Compact chip row mirroring the theme picker above —
+                // descriptions live in the editor's "?" tooltip / docs
+                // rather than crowding this section.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        NfcAction.Background to "Background",
+                        NfcAction.Overlay to "Overlay",
+                        NfcAction.OpenApp to "Open app",
+                    ).forEach { (action, label) ->
+                        FilterChip(
+                            selected = settings.nfcAction == action,
+                            onClick = { viewModel.setNfcAction(action) },
                             label = { Text(label) },
                         )
                     }

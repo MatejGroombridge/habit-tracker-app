@@ -317,11 +317,12 @@ int style TextAppearance_Compat_Notification_Time 0x7f0a000f
 int style TextAppearance_Compat_Notification_Title 0x7f0a0010
 int style Theme_App 0x7f0a0011
 int style Theme_App_Main 0x7f0a0012
-int style Theme_SplashScreen 0x7f0a0013
-int style Theme_SplashScreen_Common 0x7f0a0014
-int style Theme_SplashScreen_IconBackground 0x7f0a0015
-int style Widget_Compat_NotificationActionContainer 0x7f0a0016
-int style Widget_Compat_NotificationActionText 0x7f0a0017
+int style Theme_App_Transparent 0x7f0a0013
+int style Theme_SplashScreen 0x7f0a0014
+int style Theme_SplashScreen_Common 0x7f0a0015
+int style Theme_SplashScreen_IconBackground 0x7f0a0016
+int style Widget_Compat_NotificationActionContainer 0x7f0a0017
+int style Widget_Compat_NotificationActionText 0x7f0a0018
 int[] styleable ActivityNavigator { 0x01010003, 0x7f010000, 0x7f010003, 0x7f010004, 0x7f010027 }
 int styleable ActivityNavigator_android_name 0
 int styleable ActivityNavigator_action 1

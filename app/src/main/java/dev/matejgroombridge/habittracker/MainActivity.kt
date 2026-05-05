@@ -1,6 +1,7 @@
 package dev.matejgroombridge.habittracker
 
 import android.app.Application
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -37,6 +39,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.matejgroombridge.habittracker.data.model.Habit
+import dev.matejgroombridge.habittracker.data.repository.HabitRepository
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
 import dev.matejgroombridge.habittracker.ui.SettingsViewModel
 import dev.matejgroombridge.habittracker.ui.screens.AnalyticsScreen
@@ -44,6 +48,8 @@ import dev.matejgroombridge.habittracker.ui.screens.ArchivedHabitsScreen
 import dev.matejgroombridge.habittracker.ui.screens.HomeScreen
 import dev.matejgroombridge.habittracker.ui.screens.PastWeekScreen
 import dev.matejgroombridge.habittracker.ui.screens.SettingsScreen
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 private object Routes {
     const val HOME = "home"
@@ -61,8 +67,8 @@ private data class BottomTab(
 
 private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HOME, "Today", Icons.Outlined.CheckCircle),
-    BottomTab(Routes.PAST_WEEK, "Past week", Icons.Outlined.CalendarViewWeek),
-    BottomTab(Routes.ANALYTICS, "All time", Icons.Outlined.BarChart),
+    BottomTab(Routes.PAST_WEEK, "Past Week", Icons.Outlined.CalendarViewWeek),
+    BottomTab(Routes.ANALYTICS, "All Time", Icons.Outlined.BarChart),
 )
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +76,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // If we were launched from an NFC "open" deep link, complete the
+        // referenced habit before any UI shows. NfcCompletionActivity already
+        // does this for the background/overlay paths; we mirror the same
+        // behaviour here for OpenApp so the result is identical regardless of
+        // which entry point the system picked.
+        completeHabitFromIntent(intent)
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.factory(application),
@@ -84,6 +96,30 @@ class MainActivity : ComponentActivity() {
                     AppShell(settingsViewModel = settingsViewModel)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        completeHabitFromIntent(intent)
+    }
+
+    /**
+     * If [intent] carries one of our deep links (`habittracker://habit/open/<id>`
+     * or `.../complete/<id>`), mark today's completion for that habit. The
+     * navigation graph itself doesn't depend on the deep link — opening the
+     * app to the Home tab is good enough; the user will see the new tick.
+     */
+    private fun completeHabitFromIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != Habit.DEEP_LINK_SCHEME) return
+        val segments = data.pathSegments
+        if (segments.size < 2) return
+        val habitId = segments[1].takeIf { it.isNotBlank() } ?: return
+        val repo = HabitRepository(applicationContext)
+        lifecycleScope.launch {
+            repo.setCompleted(habitId, LocalDate.now().toEpochDay(), completed = true)
         }
     }
 }

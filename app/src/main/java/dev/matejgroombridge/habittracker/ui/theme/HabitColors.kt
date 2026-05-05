@@ -24,6 +24,9 @@ data class HabitColorEntry(
 
 object HabitColors {
 
+    // A curated 8-colour palette covering the main hue families: warm pinks,
+    // oranges/yellows, greens, blues, purples, and a neutral. Picking 8 keeps
+    // the colour row in the editor dialog uncluttered and easy to scan.
     val palette: List<HabitColorEntry> = listOf(
         HabitColorEntry(
             key = "blush",
@@ -58,12 +61,14 @@ object HabitColors {
             onColor = Color(0xFF143222),
         ),
         HabitColorEntry(
-            key = "sage",
-            label = "Sage",
-            light = Color(0xFFDDE8D2),
-            dark = Color(0xFF3D4A33),
-            accent = Color(0xFFA8C690),
-            onColor = Color(0xFF1F2A14),
+            // Sits between mint (green) and sky (blue) so the palette flows
+            // smoothly along the green→cyan→blue axis.
+            key = "teal",
+            label = "Teal",
+            light = Color(0xFFCFE8E4),
+            dark = Color(0xFF2F4D49),
+            accent = Color(0xFF8DCDC4),
+            onColor = Color(0xFF143230),
         ),
         HabitColorEntry(
             key = "sky",
@@ -80,54 +85,6 @@ object HabitColors {
             dark = Color(0xFF3F354F),
             accent = Color(0xFFB7A5DD),
             onColor = Color(0xFF231A38),
-        ),
-        HabitColorEntry(
-            key = "lilac",
-            label = "Lilac",
-            light = Color(0xFFF1D8F0),
-            dark = Color(0xFF4F3450),
-            accent = Color(0xFFD7A1D5),
-            onColor = Color(0xFF381A38),
-        ),
-        HabitColorEntry(
-            key = "rose",
-            label = "Rose",
-            light = Color(0xFFF6D5DD),
-            dark = Color(0xFF55343C),
-            accent = Color(0xFFE39CAA),
-            onColor = Color(0xFF3A1620),
-        ),
-        HabitColorEntry(
-            key = "sand",
-            label = "Sand",
-            light = Color(0xFFEDE2CD),
-            dark = Color(0xFF4D4231),
-            accent = Color(0xFFCBB68A),
-            onColor = Color(0xFF2C2516),
-        ),
-        HabitColorEntry(
-            key = "coral",
-            label = "Coral",
-            light = Color(0xFFFFD9CC),
-            dark = Color(0xFF5A3A30),
-            accent = Color(0xFFFFA688),
-            onColor = Color(0xFF3A1B0F),
-        ),
-        HabitColorEntry(
-            key = "teal",
-            label = "Teal",
-            light = Color(0xFFCFE8E4),
-            dark = Color(0xFF2F4D49),
-            accent = Color(0xFF8DCDC4),
-            onColor = Color(0xFF143230),
-        ),
-        HabitColorEntry(
-            key = "periwinkle",
-            label = "Periwinkle",
-            light = Color(0xFFD7DDF7),
-            dark = Color(0xFF373E5E),
-            accent = Color(0xFFA1ACE0),
-            onColor = Color(0xFF1A2148),
         ),
         HabitColorEntry(
             key = "fog",

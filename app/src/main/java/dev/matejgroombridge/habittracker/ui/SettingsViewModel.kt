@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.matejgroombridge.habittracker.data.settings.NfcAction
 import dev.matejgroombridge.habittracker.data.settings.Settings
 import dev.matejgroombridge.habittracker.data.settings.SettingsRepository
 import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
@@ -26,6 +27,10 @@ class SettingsViewModel(
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { repository.setThemeMode(mode) }
+    }
+
+    fun setNfcAction(action: NfcAction) {
+        viewModelScope.launch { repository.setNfcAction(action) }
     }
 
     companion object {

@@ -22,6 +22,7 @@ class SettingsRepository(private val context: Context) {
     val settings: Flow<Settings> = context.settingsDataStore.data.map { prefs ->
         Settings(
             themeMode = prefs[KEY_THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
+            nfcAction = prefs[KEY_NFC_ACTION]?.let(::parseNfcAction) ?: NfcAction.Default,
         )
     }
 
@@ -31,11 +32,22 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    suspend fun setNfcAction(action: NfcAction) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[KEY_NFC_ACTION] = action.name
+        }
+    }
+
     private fun parseThemeMode(raw: String): ThemeMode = runCatching {
         ThemeMode.valueOf(raw)
     }.getOrDefault(ThemeMode.System)
 
+    private fun parseNfcAction(raw: String): NfcAction = runCatching {
+        NfcAction.valueOf(raw)
+    }.getOrDefault(NfcAction.Default)
+
     private companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+        val KEY_NFC_ACTION = stringPreferencesKey("nfc_action")
     }
 }

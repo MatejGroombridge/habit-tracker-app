@@ -6,6 +6,45 @@
                 {
                     "source": "/Users/mgroombridge/habit-tracker/app/src/main/res/values-night/themes.xml",
                     "from": {
+                        "startLines": "-1,-1,13",
+                        "startColumns": "-1,-1,4",
+                        "startOffsets": "-1,-1,696",
+                        "endLines": "-1,-1,21",
+                        "endColumns": "-1,-1,12",
+                        "endOffsets": "-1,-1,1280"
+                    },
+                    "to": {
+                        "startLines": "3,7,13",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "186,410,815",
+                        "endLines": "6,12,21",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "405,810,1399"
+                    }
+                },
+                {
+                    "source": "/Users/mgroombridge/.gradle/caches/9.0.0/transforms/3e1357119119fc505e1e078d30eb3fa9/transformed/core-splashscreen-1.0.1/res/values-night-v8/values-night-v8.xml",
+                    "from": {
+                        "startLines": "-1",
+                        "startColumns": "-1",
+                        "startOffsets": "-1"
+                    },
+                    "to": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "100",
+                        "endColumns": "85",
+                        "endOffsets": "181"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "/Users/mgroombridge/.gradle/daemon/9.0.0/dev.matejgroombridge.habittracker.app-mergeDebugResources-55:/values-night-v8/values-night-v8.xml",
+            "map": [
+                {
+                    "source": "/Users/mgroombridge/habit-tracker/app/src/main/res/values-night/themes.xml",
+                    "from": {
                         "startLines": "1,6",
                         "startColumns": "4,4",
                         "startOffsets": "63,288",

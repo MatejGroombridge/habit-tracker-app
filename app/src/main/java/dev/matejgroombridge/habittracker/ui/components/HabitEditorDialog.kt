@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,12 +22,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Nfc
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -62,7 +72,10 @@ sealed interface HabitEditorResult {
         val frequency: HabitFrequency,
     ) : HabitEditorResult
 
-    data object Delete : HabitEditorResult
+    /**
+     * Delete is intentionally not exposed from this dialog — habits can only
+     * be deleted from the Archive screen. Use [Archive] to archive first.
+     */
     data class Archive(val archived: Boolean) : HabitEditorResult
 }
 
@@ -72,8 +85,9 @@ sealed interface HabitEditorResult {
  * creation (the user can change it from the picker if they want).
  *
  * For edit mode, archive is a small icon-only action at the top-right of the
- * dialog title row, and delete is a destructive icon-only button on the
- * action bar — keeps the bottom row uncluttered.
+ * dialog title row. Deletion is intentionally not available here — to delete
+ * a habit the user must first archive it and then delete from the Archive
+ * screen, which protects against accidental loss of completion history.
  */
 @Composable
 fun HabitEditorDialog(
@@ -133,7 +147,7 @@ fun HabitEditorDialog(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (isEdit) "Edit habit" else "New habit",
+                    text = if (isEdit) "Edit Habit" else "New Habit",
                     modifier = Modifier.weight(1f),
                 )
                 if (isEdit) {
@@ -156,7 +170,12 @@ fun HabitEditorDialog(
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                // 14dp gives a comfortable rhythm between the title row,
+                // description field, frequency picker, and NFC link without
+                // the awkward "is this a new section or just whitespace?"
+                // gaps a larger value created. Section headers contribute
+                // no padding of their own — see SectionLabel{,WithHelp}.
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -188,13 +207,32 @@ fun HabitEditorDialog(
                     maxLines = 3,
                 )
 
-                SectionLabel("Frequency")
-                FrequencyPicker(
-                    kind = frequencyKind,
-                    onKindChange = { frequencyKind = it },
-                    intervalDays = intervalDays,
-                    onIntervalChange = { intervalDays = it.coerceIn(1, 30) },
-                )
+                // Each section header is grouped with its content in a
+                // tight Column so the gap between label and control is
+                // visibly smaller (4dp) than the gap between sections
+                // (the parent's 14dp spacedBy).
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionLabel("Frequency")
+                    FrequencyPicker(
+                        kind = frequencyKind,
+                        onKindChange = { frequencyKind = it },
+                        intervalDays = intervalDays,
+                        onIntervalChange = { intervalDays = it.coerceIn(1, 30) },
+                    )
+                }
+
+                if (existing != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionLabelWithHelp(
+                            text = "NFC Tag Link",
+                            helpText = "Write this URL to an NFC tag with any tag-writer " +
+                                "app. Scanning the tag will complete this habit. " +
+                                "What happens on scan (background / overlay / open the " +
+                                "app) is set in Settings → NFC.",
+                        )
+                        NfcLinkRow(url = existing.nfcUrl, habitName = existing.name)
+                    }
+                }
             }
         },
         confirmButton = {
@@ -203,20 +241,7 @@ fun HabitEditorDialog(
             }
         },
         dismissButton = {
-            // Cancel sits on the left; in edit mode we also surface a small
-            // delete icon-button beside it so it doesn't crowd save.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isEdit) {
-                    IconButton(onClick = { onResult(HabitEditorResult.Delete) }) {
-                        Icon(
-                            imageVector = Icons.Outlined.DeleteOutline,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 
@@ -274,7 +299,7 @@ private fun IconAndColorPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Choose an icon") },
+        title = { Text("Choose an Icon") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 ColorRow(selectedKey = selectedColorKey, onSelected = onColorSelected)
@@ -457,4 +482,133 @@ private fun StepperButton(
             modifier = Modifier.size(18.dp),
         )
     }
+}
+
+/**
+ * Read-only display of the habit's NFC URL, with copy and share buttons.
+ *
+ * The user pastes this URL into any NFC-writer app and writes it to a tag.
+ * Tapping the tag triggers `NfcCompletionActivity`, which marks the habit
+ * complete and runs the action chosen in Settings.
+ */
+@Composable
+private fun NfcLinkRow(url: String, habitName: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Nfc,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = url,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+        )
+        IconButton(onClick = { copyToClipboard(context, url) }) {
+            Icon(
+                imageVector = Icons.Outlined.ContentCopy,
+                contentDescription = "Copy NFC link",
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        IconButton(onClick = { shareUrl(context, url, habitName) }) {
+            Icon(
+                imageVector = Icons.Outlined.Share,
+                contentDescription = "Share NFC link",
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Section header that pairs a label with a small `?` icon. Tapping the icon
+ * opens an in-place popover containing [helpText] — keeps the dialog from
+ * being dominated by long explanatory paragraphs while still giving the
+ * user a way to discover what the section does.
+ */
+@Composable
+private fun SectionLabelWithHelp(text: String, helpText: String) {
+    var showHelp by remember { mutableStateOf(false) }
+    // No vertical padding here — vertical rhythm is owned by the parent
+    // Column's `Arrangement.spacedBy`, so this header should be the same
+    // visual height as a plain SectionLabel().
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(2.dp))
+        Box {
+            // Use a clickable Box rather than IconButton so the help icon
+            // sits flush with the label — IconButton's 48dp min size adds
+            // a noticeable amount of empty vertical space.
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .clickable { showHelp = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                    contentDescription = "What's this?",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            if (showHelp) {
+                androidx.compose.ui.window.Popup(
+                    alignment = Alignment.TopStart,
+                    onDismissRequest = { showHelp = false },
+                    properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+                ) {
+                    androidx.compose.material3.Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .padding(top = 28.dp)
+                            .widthIn(max = 280.dp),
+                    ) {
+                        Text(
+                            text = helpText,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun copyToClipboard(context: Context, url: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Habit NFC link", url))
+    Toast.makeText(context, "NFC link copied", Toast.LENGTH_SHORT).show()
+}
+
+private fun shareUrl(context: Context, url: String, habitName: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "NFC link for $habitName")
+        putExtra(Intent.EXTRA_TEXT, url)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share NFC link"))
 }

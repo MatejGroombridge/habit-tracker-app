@@ -66,6 +66,26 @@ data class Habit(
     }
 
     /**
+     * The longest run of consecutive completed days this habit has ever had.
+     * Used in the All Time analytics row as a "personal best" alongside the
+     * current streak.
+     *
+     * Walks the sorted completion set once, so this is O(n log n) due to the
+     * sort and O(n) thereafter. Empty set → 0.
+     */
+    fun longestStreak(): Long {
+        if (completedDays.isEmpty()) return 0L
+        val sorted = completedDays.sorted()
+        var best = 1L
+        var run = 1L
+        for (i in 1 until sorted.size) {
+            run = if (sorted[i] == sorted[i - 1] + 1) run + 1 else 1L
+            if (run > best) best = run
+        }
+        return best
+    }
+
+    /**
      * Whether the habit should *visually* render as completed on [day].
      *
      * Daily habits are completed iff [day] is in [completedDays]. For weekly
@@ -88,8 +108,23 @@ data class Habit(
         return (day - mostRecent) < window
     }
 
+    /**
+     * URL that, when scanned from an NFC tag, will complete this habit. Behaviour
+     * (background / overlay / open app) is controlled by [dev.matejgroombridge.habittracker.data.settings.NfcAction].
+     *
+     * Built using [DEEP_LINK_SCHEME] + [DEEP_LINK_HOST] + this habit's [id].
+     * Suitable for writing to an NFC tag with any tag-writer app.
+     */
+    val nfcUrl: String get() = "$DEEP_LINK_SCHEME://$DEEP_LINK_HOST/complete/$id"
+
     companion object {
         const val DEFAULT_ICON_KEY = "check_circle"
         const val DEFAULT_COLOR_KEY = "blush"
+
+        // App-private deep-link scheme; matches the intent-filter declared in
+        // AndroidManifest.xml. Avoids using `https` so writing/scanning stays
+        // entirely within this app and never opens a browser.
+        const val DEEP_LINK_SCHEME = "habittracker"
+        const val DEEP_LINK_HOST = "habit"
     }
 }

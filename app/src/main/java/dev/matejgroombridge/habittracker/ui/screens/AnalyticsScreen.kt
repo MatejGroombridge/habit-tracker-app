@@ -3,6 +3,7 @@ package dev.matejgroombridge.habittracker.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -79,7 +81,7 @@ fun AnalyticsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("All time") },
+                title = { Text("All Time") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -126,6 +128,7 @@ private fun AnalyticsRow(
 
     val totalCompletions = remember(habit.completedDays) { habit.completedDays.size }
     val streak = remember(habit.completedDays, today) { habit.currentStreak(today) }
+    val topStreak = remember(habit.completedDays) { habit.longestStreak() }
 
     val contentColor = MaterialTheme.colorScheme.onBackground
     val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -167,15 +170,33 @@ private fun AnalyticsRow(
                         color = mutedColor,
                     )
                     Spacer(Modifier.width(10.dp))
+                    // Current streak — fire icon, rendered in the habit's
+                    // accent so each row gets a touch of personality.
                     Icon(
                         imageVector = Icons.Outlined.LocalFireDepartment,
-                        contentDescription = "Streak",
+                        contentDescription = "Current streak",
                         tint = color.accent,
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(3.dp))
                     Text(
                         text = streak.toString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = mutedColor,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    // Top streak — trophy icon. Always shown, even when it
+                    // equals the current streak, so the layout doesn't
+                    // jump as a habit's record is matched and broken.
+                    Icon(
+                        imageVector = Icons.Outlined.EmojiEvents,
+                        contentDescription = "Top streak",
+                        tint = color.accent,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = topStreak.toString(),
                         style = MaterialTheme.typography.bodySmall,
                         color = mutedColor,
                     )
@@ -194,7 +215,10 @@ private fun AnalyticsRow(
     }
 }
 
-private const val MIN_WEEKS = 16
+private val CELL_SIZE = 12.dp
+private val CELL_GAP = 3.dp
+private val GRID_LEFT_PADDING = 20.dp
+private val GRID_RIGHT_PADDING = 12.dp
 
 @Composable
 private fun ContributionGrid(
@@ -205,61 +229,73 @@ private fun ContributionGrid(
     accent: Color,
     emptyTint: Color,
 ) {
-    // How many weeks of history do we have between creation and the end of
-    // this week? We always render at least MIN_WEEKS so the grid feels
-    // populated even on a brand-new habit; the user can scroll left to see
-    // any pre-creation columns (which all render as empty/future cells).
-    val weeksAvailable = remember(createdAtEpochDay, endOfCurrentWeek) {
-        val createdDate = LocalDate.ofEpochDay(createdAtEpochDay)
-        val daysBetween = java.time.temporal.ChronoUnit.DAYS
-            .between(createdDate, endOfCurrentWeek).toInt()
-        // +1 because both endpoints inclusive when computing weeks of coverage.
-        val computed = (daysBetween + 6) / 7 + 1
-        maxOf(MIN_WEEKS, computed)
-    }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // Compute how many 7-day columns fit comfortably across the
+        // available width given our cell size + inter-column gap and the
+        // chosen left/right insets.
+        val columnsThatFit = run {
+            val available = maxWidth - GRID_LEFT_PADDING - GRID_RIGHT_PADDING
+            val columnPitch = CELL_SIZE + CELL_GAP // includes the gap after each column
+            // +CELL_GAP because the final column doesn't need a trailing gap,
+            // so we get one "free" pitch's worth of room.
+            ((available + CELL_GAP) / columnPitch).toInt().coerceAtLeast(1)
+        }
 
-    val scrollState = rememberScrollState()
+        // Total weeks rendered = at least enough to fill the screen, but
+        // grow over time so the user can scroll back through history.
+        val weeksAvailable = remember(createdAtEpochDay, endOfCurrentWeek, columnsThatFit) {
+            val createdDate = LocalDate.ofEpochDay(createdAtEpochDay)
+            val daysBetween = java.time.temporal.ChronoUnit.DAYS
+                .between(createdDate, endOfCurrentWeek).toInt()
+            val historyWeeks = (daysBetween + 6) / 7 + 1
+            maxOf(columnsThatFit, historyWeeks)
+        }
 
-    // Snap to the rightmost (most recent) week on first composition + every
-    // time the available week count grows.
-    androidx.compose.runtime.LaunchedEffect(weeksAvailable) {
-        scrollState.scrollTo(scrollState.maxValue)
-    }
+        val scrollState = rememberScrollState()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState),
-        // Push columns toward the right edge so the most recent week is
-        // flush with the screen's right side and older weeks fill leftward.
-        horizontalArrangement = Arrangement.End,
-    ) {
-        // Render oldest → newest so the rightmost (last) column is the
-        // current week.
-        for (weeksBack in (weeksAvailable - 1) downTo 0) {
-            val weekMonday = endOfCurrentWeek.minusDays(6).minusWeeks(weeksBack.toLong())
-            Column(
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-                modifier = Modifier.padding(end = if (weeksBack == 0) 0.dp else 3.dp),
-            ) {
-                for (offset in 0..6) {
-                    val cellDate = weekMonday.plusDays(offset.toLong())
-                    val cellEpoch = cellDate.toEpochDay()
-                    val inFuture = cellEpoch > today
-                    val completed = cellEpoch in completedDays
-                    val cellColor = when {
-                        completed -> accent
-                        // Future cells: slightly faded version of empty so the
-                        // grid keeps its 7-row shape without looking "missing".
-                        inFuture -> emptyTint.copy(alpha = 0.35f)
-                        else -> emptyTint
+        // Snap to the rightmost (most recent) week on first composition + every
+        // time the available week count grows.
+        androidx.compose.runtime.LaunchedEffect(weeksAvailable) {
+            scrollState.scrollTo(scrollState.maxValue)
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(start = GRID_LEFT_PADDING, end = GRID_RIGHT_PADDING),
+            // The right padding above provides the small breathing space on
+            // the right; columns themselves use `Arrangement.End` so the
+            // current week sits at the trailing edge of the row.
+            horizontalArrangement = Arrangement.End,
+        ) {
+            // Render oldest → newest so the rightmost (last) column is the
+            // current week.
+            for (weeksBack in (weeksAvailable - 1) downTo 0) {
+                val weekMonday = endOfCurrentWeek.minusDays(6).minusWeeks(weeksBack.toLong())
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(CELL_GAP),
+                    modifier = Modifier.padding(end = if (weeksBack == 0) 0.dp else CELL_GAP),
+                ) {
+                    for (offset in 0..6) {
+                        val cellDate = weekMonday.plusDays(offset.toLong())
+                        val cellEpoch = cellDate.toEpochDay()
+                        val inFuture = cellEpoch > today
+                        val completed = cellEpoch in completedDays
+                        val cellColor = when {
+                            completed -> accent
+                            // Future cells: slightly faded version of empty so the
+                            // grid keeps its 7-row shape without looking "missing".
+                            inFuture -> emptyTint.copy(alpha = 0.35f)
+                            else -> emptyTint
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(CELL_SIZE)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(cellColor),
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(cellColor),
-                    )
                 }
             }
         }

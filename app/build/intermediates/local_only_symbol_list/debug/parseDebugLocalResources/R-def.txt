@@ -8,5 +8,6 @@ mipmap ic_launcher_round
 string app_name
 style Theme.App
 style Theme.App.Main
+style Theme.App.Transparent
 xml backup_rules
 xml data_extraction_rules

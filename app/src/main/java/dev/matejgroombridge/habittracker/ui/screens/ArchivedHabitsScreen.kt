@@ -67,7 +67,7 @@ fun ArchivedHabitsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Archived habits") },
+                title = { Text("Archived Habits") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -110,7 +110,7 @@ fun ArchivedHabitsScreen(
     pendingDelete?.let { habit ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete habit?") },
+            title = { Text("Delete Habit?") },
             text = { Text("\"${habit.name}\" will be permanently removed along with its history.") },
             confirmButton = {
                 TextButton(onClick = {

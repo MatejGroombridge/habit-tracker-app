@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-33:12
-INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-33:12
-INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-33:12
-INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-33:12
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-75:12
+INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-75:12
+INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-75:12
+INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:1-75:12
 MERGED from [androidx.navigation:navigation-common:2.8.5] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/74a9bcce7ba21468addd421cbe90b2d2/transformed/navigation-common-2.8.5/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.8.5] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/ee09eda8213bfdf0999b7c27f0bcafcf/transformed/navigation-runtime-2.8.5/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.8.5] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/fcbf22c04eab74c161ee02b37436292f/transformed/navigation-common-ktx-2.8.5/AndroidManifest.xml:2:1-7:12
@@ -70,9 +70,13 @@ MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/mgroombri
 		INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml
 	xmlns:android
 		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.NFC
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:14:5-62
+	android:name
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:14:22-59
 application
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:9:5-31:19
-INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:9:5-31:19
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:16:5-73:19
+INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:16:5-73:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/a217ecd7a8dc4724d068b95e47706a92/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/a217ecd7a8dc4724d068b95e47706a92/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.lifecycle:lifecycle-process:2.8.7] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/6f8875ebbec790854c3831006656e8fb/transformed/lifecycle-process-2.8.7/AndroidManifest.xml:23:5-33:19
@@ -92,43 +96,87 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/mgro
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.15.0] /Users/mgroombridge/.gradle/caches/9.0.0/transforms/c63ec0d4bfbaeffb5a69928698518063/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:16:9-35
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:23:9-35
 	android:label
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:14:9-41
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:21:9-41
 	android:fullBackupContent
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:12:9-54
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:19:9-54
 	android:roundIcon
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:15:9-54
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:22:9-54
 	tools:targetApi
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:19:9-29
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:26:9-29
 	android:icon
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:13:9-43
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:20:9-43
 	android:allowBackup
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:10:9-35
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:17:9-35
 	android:theme
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:17:9-41
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:24:9-41
 	android:enableOnBackInvokedCallback
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:18:9-51
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:25:9-51
 	android:dataExtractionRules
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:11:9-65
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:18:9-65
 activity#dev.matejgroombridge.habittracker.MainActivity
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:21:9-29:20
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:28:9-48:20
 	android:exported
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:23:13-36
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:30:13-36
 	android:theme
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:24:13-50
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:31:13-50
 	android:name
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:22:13-41
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:29:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:25:13-28:29
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:32:13-35:29
 action#android.intent.action.MAIN
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:26:17-69
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:33:17-69
 	android:name
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:26:25-66
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:33:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:27:17-77
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:34:17-77
 	android:name
-		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:27:27-74
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:34:27-74
+intent-filter#action:name:android.intent.action.VIEW+category:name:android.intent.category.BROWSABLE+category:name:android.intent.category.DEFAULT+data:host:habit+data:pathPrefix:/open+data:scheme:habittracker
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:39:13-47:29
+	android:autoVerify
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:39:28-54
+action#android.intent.action.VIEW
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:40:17-69
+	android:name
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:40:25-66
+category#android.intent.category.DEFAULT
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:41:17-76
+	android:name
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:41:27-73
+category#android.intent.category.BROWSABLE
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:42:17-78
+	android:name
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:42:27-75
+data
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:43:17-46:50
+	android:host
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:45:21-41
+	android:scheme
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:44:21-50
+	android:pathPrefix
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:46:21-47
+activity#dev.matejgroombridge.habittracker.nfc.NfcCompletionActivity
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:54:9-71:20
+	android:excludeFromRecents
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:58:13-46
+	android:launchMode
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:60:13-44
+	android:noHistory
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:57:13-37
+	android:exported
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:56:13-36
+	android:theme
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:61:13-57
+	android:taskAffinity
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:59:13-36
+	android:name
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:55:13-54
+intent-filter#action:name:android.intent.action.VIEW+category:name:android.intent.category.BROWSABLE+category:name:android.intent.category.DEFAULT+data:host:habit+data:pathPrefix:/complete+data:scheme:habittracker
+ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:62:13-70:29
+	android:autoVerify
+		ADDED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml:62:28-54
 uses-sdk
 INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /Users/mgroombridge/habit-tracker/app/src/main/AndroidManifest.xml

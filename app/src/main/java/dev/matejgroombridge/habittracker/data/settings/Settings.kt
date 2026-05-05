@@ -9,4 +9,5 @@ import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
  */
 data class Settings(
     val themeMode: ThemeMode = ThemeMode.System,
+    val nfcAction: NfcAction = NfcAction.Default,
 )

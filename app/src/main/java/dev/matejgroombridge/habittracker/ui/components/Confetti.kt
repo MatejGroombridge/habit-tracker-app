@@ -23,14 +23,19 @@ import kotlin.random.Random
 
 /**
  * Fires a one-shot burst of falling confetti when [trigger] flips from false
- * to true. Particle count, gravity, and lifetime are tuned for a brief
- * "you did it!" pulse rather than a long shower.
+ * to true. The animation is tuned so particles travel all the way down the
+ * screen — they only begin fading once they're near the bottom edge, giving
+ * a satisfying "rain through to the floor" feel rather than dissolving in
+ * mid-air.
+ *
+ * Particle count is generous (default 500) for a celebratory shower; the
+ * canvas-based renderer makes that very cheap.
  */
 @Composable
 fun ConfettiOverlay(
     trigger: Boolean,
     modifier: Modifier = Modifier,
-    particleCount: Int = 80,
+    particleCount: Int = 500,
 ) {
     // Each call to this composable owns one batch of particles. Re-keying
     // the state on a counter that bumps when `trigger` becomes true gives us
@@ -50,7 +55,8 @@ fun ConfettiOverlay(
         progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 2200,
+                // Long enough for the slowest particles to clear the screen.
+                durationMillis = 5500,
                 easing = androidx.compose.animation.core.LinearEasing,
             ),
         )
@@ -62,7 +68,22 @@ fun ConfettiOverlay(
         val w = size.width
         val h = size.height
         val t = progress.value
-        if (t >= 1f) return@Canvas
+        // Note: we intentionally do *not* short-circuit at t >= 1f. The
+        // animation runs to 1.0 and any remaining particles smoothly fade
+        // out via [globalFade] below — exiting at exactly t==1 was what
+        // produced the abrupt "snap" the user reported.
+        if (t > 1f) return@Canvas
+
+        // A whole-canvas fade applied during the final 12% of the timeline
+        // so any particles still in flight don't pop off-screen when the
+        // animation completes. Combined with the bottom-edge fade below,
+        // the result is: particles either reach the floor (and fade as they
+        // land) OR fade gracefully in mid-air at the very end — never snap.
+        val tailFadeStart = 0.88f
+        val globalFade = if (t < tailFadeStart) 1f
+        else (1f - (t - tailFadeStart) / (1f - tailFadeStart)).coerceIn(0f, 1f)
+
+        if (globalFade <= 0f) return@Canvas
 
         particles.forEach { p ->
             // Position: launched from a horizontal band near the top; the
@@ -71,16 +92,36 @@ fun ConfettiOverlay(
             val ty = -20f
             val vx = p.vx * w
             val vy = p.vy * h
-            val gravity = 1.6f * h
+            // Stronger gravity gives the confetti enough downward push to
+            // reach the bottom of the screen even from slow upward launches.
+            val gravity = 2.4f * h
 
-            val x = tx + vx * t
-            val y = ty + vy * t + 0.5f * gravity * t * t
+            // Stagger each particle's start so a long, sustained shower
+            // forms instead of one big synchronised wave.
+            val localT = (t - p.startDelay).coerceAtLeast(0f)
 
-            // Off-screen culling.
-            if (y > h + 40f) return@forEach
+            val x = tx + vx * localT
+            val y = ty + vy * localT + 0.5f * gravity * localT * localT
 
-            val rotation = p.spin * t * 360f
-            val alpha = (1f - t).coerceIn(0f, 1f)
+            // Don't draw particles that haven't started yet or have fully
+            // exited the bottom of the screen (with a small margin).
+            if (localT <= 0f) return@forEach
+            if (y > h + 60f) return@forEach
+
+            val rotation = p.spin * localT * 360f
+
+            // Per-particle alpha: stays at 1 for most of the descent, fades
+            // out as the particle approaches / passes the bottom edge.
+            val fadeStart = h * 0.85f
+            val fadeEnd = h + 60f
+            val edgeFade = when {
+                y < fadeStart -> 1f
+                y >= fadeEnd -> 0f
+                else -> 1f - ((y - fadeStart) / (fadeEnd - fadeStart))
+            }.coerceIn(0f, 1f)
+
+            val alpha = edgeFade * globalFade
+            if (alpha <= 0f) return@forEach
 
             rotate(degrees = rotation, pivot = Offset(x, y)) {
                 drawRect(
@@ -101,22 +142,31 @@ private data class Particle(
     val width: Float,
     val height: Float,
     val color: Color,
+    /** Fraction of [0,1] before this particle starts falling — staggers the shower. */
+    val startDelay: Float,
 )
 
 private fun generateParticles(n: Int): List<Particle> {
     val palette = HabitColors.palette.map { it.accent }
     return List(n) {
-        val angle = Random.nextDouble(-PI / 2 - PI / 6, -PI / 2 + PI / 6)
-        val speed = Random.nextDouble(0.6, 1.1).toFloat()
+        // Wider launch spread (almost 180° fan) and stronger initial speed
+        // so confetti shoots upward and outward across most of the screen.
+        val angle = Random.nextDouble(-PI / 2 - PI / 2.4, -PI / 2 + PI / 2.4)
+        val speed = Random.nextDouble(0.9, 1.7).toFloat()
         Particle(
-            startXFrac = Random.nextFloat() * 0.6f + 0.2f,
-            vx = (cos(angle).toFloat()) * speed * 0.8f,
-            vy = (sin(angle).toFloat()) * speed * 0.6f,
-            spin = if (Random.nextBoolean()) Random.nextFloat() + 0.5f
-            else -(Random.nextFloat() + 0.5f),
-            width = (6 + Random.nextInt(6)).dp.value * 1.6f,
-            height = (10 + Random.nextInt(8)).dp.value * 1.6f,
+            // Spread the launch points across the full width of the screen
+            // for a confetti-cannon feel rather than a tight column.
+            startXFrac = Random.nextFloat() * 0.95f + 0.025f,
+            vx = (cos(angle).toFloat()) * speed * 1.1f,
+            vy = (sin(angle).toFloat()) * speed * 0.9f,
+            spin = if (Random.nextBoolean()) Random.nextFloat() * 1.5f + 0.7f
+            else -(Random.nextFloat() * 1.5f + 0.7f),
+            width = (6 + Random.nextInt(8)).dp.value * 1.8f,
+            height = (10 + Random.nextInt(10)).dp.value * 1.8f,
             color = palette.random(),
+            // Up to ~25% of the timeline used as a launch stagger so the
+            // shower feels continuous rather than a single synced wave.
+            startDelay = Random.nextFloat() * 0.25f,
         )
     }
 }

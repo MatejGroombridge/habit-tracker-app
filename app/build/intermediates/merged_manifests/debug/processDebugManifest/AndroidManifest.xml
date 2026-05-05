@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.matejgroombridge.habittracker.debug"
-    android:versionCode="4"
-    android:versionName="0.3.0-debug" >
+    android:versionCode="5"
+    android:versionName="0.4.0-debug" >
 
     <uses-sdk
         android:minSdkVersion="26"
         android:targetSdkVersion="35" />
+
+    <!--
+         Add the permissions your specific app needs here. INTERNET is the most
+         common; the rest of these are commented placeholders.
+    -->
+    <!-- <uses-permission android:name="android.permission.INTERNET" /> -->
+
+
+    <!--
+         NFC permission is declared here mainly so the OS recognises this app
+         as an NFC handler. We don't actively read tags ourselves; instead, the
+         user writes a habit's `habittracker://habit/complete/<id>` URL onto a
+         tag with any tag-writer app. When tapped, Android delivers a VIEW
+         intent for that URL to NfcCompletionActivity below.
+    -->
+    <uses-permission android:name="android.permission.NFC" />
 
     <permission
         android:name="dev.matejgroombridge.habittracker.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
     <uses-permission android:name="dev.matejgroombridge.habittracker.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
-    <!--
- Add the permissions your specific app needs here. INTERNET is the most
-         common; the rest of these are commented placeholders.
-    -->
-    <!-- <uses-permission android:name="android.permission.INTERNET" /> -->
+
     <application
         android:allowBackup="true"
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"
@@ -40,6 +52,49 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!--
+                 "Open the app to this habit" deep link, used when the NFC
+                 action is set to OpenApp. The activity inspects the intent
+                 data on startup and marks the habit complete.
+            -->
+            <intent-filter android:autoVerify="false" >
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="habit"
+                    android:pathPrefix="/open"
+                    android:scheme="habittracker" />
+            </intent-filter>
+        </activity>
+
+        <!--
+             Receives the NFC tag's deep link, decides what to do based on the
+             user's NfcAction setting (background-complete / overlay / open
+             the app), and finishes itself. Themed transparent so the
+             "background" mode shows literally nothing on screen.
+        -->
+        <activity
+            android:name="dev.matejgroombridge.habittracker.nfc.NfcCompletionActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.App.Transparent" >
+            <intent-filter android:autoVerify="false" >
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="habit"
+                    android:pathPrefix="/complete"
+                    android:scheme="habittracker" />
             </intent-filter>
         </activity>
 

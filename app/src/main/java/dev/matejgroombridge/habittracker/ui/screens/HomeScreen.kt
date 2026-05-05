@@ -150,7 +150,6 @@ fun HomeScreen(
                         frequency = result.frequency,
                     )
                     is HabitEditorResult.Archive -> viewModel.setArchived(d.habit.id, result.archived)
-                    HabitEditorResult.Delete -> viewModel.deleteHabit(d.habit.id)
                 }
                 dialog = null
             },
@@ -185,7 +184,7 @@ private fun HabitsHeader(
             IconButton(onClick = onOpenArchive) {
                 Icon(
                     imageVector = Icons.Outlined.Archive,
-                    contentDescription = "Archived habits",
+                    contentDescription = "Archived Habits",
                 )
             }
             IconButton(onClick = onOpenSettings) {
