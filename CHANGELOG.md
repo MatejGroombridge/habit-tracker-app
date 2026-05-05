@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v1.0.0 — 2026-05-05
+
+Major UI improvements, bugfixes and feature completion
+
+
 ## v0.4.0 — 2026-05-04
 
 Core functionality + multiple views
