@@ -95,6 +95,15 @@ class SettingsViewModel(
         viewModelScope.launch { repository.setDailyHabitsOnly(enabled) }
     }
 
+    /**
+     * Toggle Zen mode. When on, the app's UI is locked to a single
+     * tap-to-complete view; the only other reachable thing is this
+     * setting itself. See [Settings.zenMode] for the full definition.
+     */
+    fun setZenMode(enabled: Boolean) {
+        viewModelScope.launch { repository.setZenMode(enabled) }
+    }
+
     companion object {
         fun factory(application: Application): ViewModelProvider.Factory = viewModelFactory {
             initializer {

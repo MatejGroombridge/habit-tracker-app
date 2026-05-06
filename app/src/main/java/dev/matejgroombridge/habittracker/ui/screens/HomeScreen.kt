@@ -113,6 +113,9 @@ fun HomeScreen(
                 HabitsHeader(
                     onOpenArchive = onOpenArchive,
                     onOpenSettings = onOpenSettings,
+                    // The archive icon disappears in Zen mode, but Settings
+                    // stays so the user has a way to flip Zen back off.
+                    showArchive = !settings.zenMode,
                 )
                 if (state.activeHabits.isEmpty()) {
                     EmptyState()
@@ -122,7 +125,9 @@ fun HomeScreen(
                         todayEpochDay = state.todayEpochDay,
                         bottomPadding = contentPadding.calculateBottomPadding() + 24.dp,
                         onToggle = viewModel::toggleToday,
-                        onLongPress = { habit -> dialog = HomeDialog.Overview(habit) },
+                        // No long-press → overview dialog while in Zen.
+                        onLongPress = if (settings.zenMode) ({ _ -> })
+                        else ({ habit -> dialog = HomeDialog.Overview(habit) }),
                         weekStart = settings.weekStart,
                     )
                 }
@@ -130,6 +135,11 @@ fun HomeScreen(
             ConfettiOverlay(trigger = fireConfetti)
         }
     }
+
+    // While Zen mode is on, no in-app dialog should ever open. Drop any
+    // pending dialog and suppress the when-branch below as a hard guard.
+    LaunchedEffect(settings.zenMode) { if (settings.zenMode) dialog = null }
+    if (settings.zenMode) return
 
     when (val d = dialog) {
         is HomeDialog.Create -> HabitEditorDialog(
@@ -174,12 +184,6 @@ fun HomeScreen(
                 // explicitly opted out of.
                 showSkipAction = settings.allowSkips,
                 showPauseAction = settings.allowPauses,
-                // Only show the per-habit reminder toggle when global
-                // reminders are on — otherwise it has no effect.
-                showRemindersToggle = settings.reminders.enabled,
-                onToggleIncludeInReminders = {
-                    viewModel.setIncludeInReminders(live.id, !live.includeInReminders)
-                },
             )
         }
         is HomeDialog.Edit -> HabitEditorDialog(
@@ -219,6 +223,7 @@ fun HomeScreen(
 private fun HabitsHeader(
     onOpenArchive: () -> Unit,
     onOpenSettings: () -> Unit,
+    showArchive: Boolean = true,
 ) {
     Box(
         modifier = Modifier
@@ -232,11 +237,13 @@ private fun HabitsHeader(
                 .padding(end = 4.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onOpenArchive) {
-                Icon(
-                    imageVector = Icons.Outlined.Archive,
-                    contentDescription = "Archived Habits",
-                )
+            if (showArchive) {
+                IconButton(onClick = onOpenArchive) {
+                    Icon(
+                        imageVector = Icons.Outlined.Archive,
+                        contentDescription = "Archived Habits",
+                    )
+                }
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(

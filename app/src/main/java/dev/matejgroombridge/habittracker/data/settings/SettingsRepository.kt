@@ -39,7 +39,12 @@ class SettingsRepository(private val context: Context) {
             allowSkips = prefs[KEY_ALLOW_SKIPS] ?: true,
             allowPauses = prefs[KEY_ALLOW_PAUSES] ?: true,
             dailyHabitsOnly = prefs[KEY_DAILY_HABITS_ONLY] ?: false,
+            zenMode = prefs[KEY_ZEN_MODE] ?: false,
         )
+    }
+
+    suspend fun setZenMode(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_ZEN_MODE] = enabled }
     }
 
     suspend fun setSwipeToNavigate(enabled: Boolean) {
@@ -117,5 +122,6 @@ class SettingsRepository(private val context: Context) {
         val KEY_ALLOW_SKIPS = booleanPreferencesKey("allow_skips")
         val KEY_ALLOW_PAUSES = booleanPreferencesKey("allow_pauses")
         val KEY_DAILY_HABITS_ONLY = booleanPreferencesKey("daily_habits_only")
+        val KEY_ZEN_MODE = booleanPreferencesKey("zen_mode")
     }
 }

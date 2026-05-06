@@ -47,6 +47,7 @@ import dev.matejgroombridge.habittracker.ui.SettingsViewModel
 import dev.matejgroombridge.habittracker.ui.util.rememberHaptics
 import dev.matejgroombridge.habittracker.ui.screens.AnalyticsScreen
 import dev.matejgroombridge.habittracker.ui.screens.ArchivedHabitsScreen
+import dev.matejgroombridge.habittracker.ui.screens.HabitRemindersScreen
 import dev.matejgroombridge.habittracker.ui.screens.HomeScreen
 import dev.matejgroombridge.habittracker.ui.screens.PastWeekScreen
 import dev.matejgroombridge.habittracker.ui.screens.ReorderHabitsScreen
@@ -61,6 +62,7 @@ private object Routes {
     const val ARCHIVE = "archive"
     const val REORDER = "reorder"
     const val WRITE_NFC = "write_nfc"
+    const val HABIT_REMINDERS = "habit_reminders"
 }
 
 private data class BottomTab(
@@ -181,6 +183,7 @@ private fun AppShell(settingsViewModel: SettingsViewModel) {
                 onBack = { navController.popBackStack() },
                 onOpenReorder = { navController.navigate(Routes.REORDER) },
                 onOpenArchive = { navController.navigate(Routes.ARCHIVE) },
+                onOpenHabitReminders = { navController.navigate(Routes.HABIT_REMINDERS) },
                 onOpenWriteNfc = { navController.navigate(Routes.WRITE_NFC) },
             )
         }
@@ -198,6 +201,12 @@ private fun AppShell(settingsViewModel: SettingsViewModel) {
         }
         composable(Routes.WRITE_NFC) {
             dev.matejgroombridge.habittracker.ui.screens.WriteNfcTagScreen(
+                viewModel = homeViewModel,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.HABIT_REMINDERS) {
+            HabitRemindersScreen(
                 viewModel = homeViewModel,
                 onBack = { navController.popBackStack() },
             )
@@ -245,9 +254,21 @@ private fun MainPager(
     // Driving the FAB from the shell so it sits above the bottom bar correctly.
     var requestCreate by remember { mutableStateOf(false) }
 
+    // When zen mode is enabled the user is locked to the Today page —
+    // snap there so the bottom-nav-less view doesn't strand them on
+    // Past Week or All Time after re-entry.
+    LaunchedEffect(settings.zenMode) {
+        if (settings.zenMode && pagerState.currentPage != TODAY_PAGE_INDEX) {
+            pagerState.scrollToPage(TODAY_PAGE_INDEX)
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
+            // Zen mode hides the bottom navigation completely — there's
+            // nothing to navigate to, only Today exists.
+            if (settings.zenMode) return@Scaffold
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ) {
@@ -274,6 +295,8 @@ private fun MainPager(
             }
         },
         floatingActionButton = {
+            // No habit creation while in Zen mode.
+            if (settings.zenMode) return@Scaffold
             if (pagerState.currentPage == TODAY_PAGE_INDEX) {
                 FloatingActionButton(
                     onClick = {
@@ -293,11 +316,10 @@ private fun MainPager(
             // instant; setting beyondViewportPageCount to 1 means at most
             // 3 pages exist at once which is fine for our screens.
             beyondViewportPageCount = 1,
-            // Honour the "Swipe to navigate" general setting. When false,
-            // the pager only responds to programmatic scrolls (i.e. the
-            // bottom-bar tap → animateScrollToPage path above). The user
-            // can still tap tabs to switch pages.
-            userScrollEnabled = settings.swipeToNavigate,
+            // Honour the "Swipe to navigate" general setting, and force
+            // it off entirely while Zen mode is on so the user can't
+            // swipe to Past Week / All Time.
+            userScrollEnabled = settings.swipeToNavigate && !settings.zenMode,
         ) { page ->
             when (page) {
                 0 -> PastWeekScreen(

@@ -75,14 +75,6 @@ fun HabitOverviewDialog(
     showSkipAction: Boolean = true,
     /** Hide the Pause icon when the global "Allow pauses" toggle is off. */
     showPauseAction: Boolean = true,
-    /**
-     * Whether to expose the per-habit "include in reminders" toggle.
-     * Pass `false` (or just omit) when the global daily-reminders setting
-     * is off, so the row doesn't appear stranded with no global behaviour
-     * to gate.
-     */
-    showRemindersToggle: Boolean = false,
-    onToggleIncludeInReminders: () -> Unit = {},
 ) {
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
@@ -226,36 +218,6 @@ fun HabitOverviewDialog(
                     todayEpochDay = todayEpochDay,
                     accent = color.accent,
                 )
-
-                if (showRemindersToggle) {
-                    Spacer(Modifier.height(14.dp))
-                    // Compact switch row matching the action-button corners
-                    // and surface so the dialog still feels like one unit.
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = onToggleIncludeInReminders,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        ) {
-                            Text(
-                                text = if (habit.includeInReminders)
-                                    "Included in daily reminders"
-                                else "Hidden from daily reminders",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            androidx.compose.material3.Switch(
-                                checked = habit.includeInReminders,
-                                onCheckedChange = { onToggleIncludeInReminders() },
-                            )
-                        }
-                    }
-                }
 
                 Spacer(Modifier.height(16.dp))
 

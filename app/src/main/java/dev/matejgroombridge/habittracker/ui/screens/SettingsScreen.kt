@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,6 +90,13 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenReorder: () -> Unit,
     onOpenArchive: () -> Unit,
+    /**
+     * Opens the per-habit reminders screen — list of every active habit
+     * with a switch controlling whether it's included in the global
+     * daily reminder notification. Replaces the old per-habit toggle
+     * that lived in the habit overview dialog.
+     */
+    onOpenHabitReminders: () -> Unit,
     onOpenWriteNfc: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -165,10 +173,47 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            // Zen mode --------------------------------------------------
+            // Always rendered, even when Zen mode is on, so the user can
+            // turn it back off. When on it's the *only* card visible.
+            SectionCaption("Zen Mode")
+            SettingsCard(contentPadding = 0.dp) {
+                Column {
+                    CompactSwitchRow(
+                        label = "Zen mode",
+                        checked = settings.zenMode,
+                        onCheckedChange = {
+                            haptics.light()
+                            viewModel.setZenMode(it)
+                        },
+                    )
+                    if (settings.zenMode) {
+                        Divider()
+                        Text(
+                            text = "Only the Today screen is reachable. " +
+                                "Tap a habit to mark it complete. Turn " +
+                                "this off to bring back the rest of the app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    }
+                }
+            }
+
+            // Everything below is hidden while Zen mode is on. Wrapping
+            // them in a single conditional keeps the spacing rhythm
+            // identical when Zen is off — the Column's spacedBy(20.dp)
+            // applies between visible sections only.
+            if (settings.zenMode) {
+                Spacer(Modifier.height(20.dp))
+                return@Column
+            }
+
             // Appearance ----------------------------------------------------
             SectionCaption("Appearance")
-            SettingsCard {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsCard(contentPadding = 0.dp) {
+                Column {
                     ThemePickerRow(
                         selected = settings.themeMode,
                         onChange = {
@@ -176,11 +221,8 @@ fun SettingsScreen(
                             viewModel.setThemeMode(it)
                         },
                     )
-                    // Compact AMOLED toggle — no subtitle, since the label
-                    // is already self-explanatory and the row sits directly
-                    // under the theme picker so context is obvious.
+                    Divider()
                     CompactSwitchRow(
-                        icon = Icons.Outlined.Brightness3,
                         label = "AMOLED dark mode",
                         checked = settings.amoled,
                         onCheckedChange = {
@@ -193,8 +235,8 @@ fun SettingsScreen(
 
             // Reminders -----------------------------------------------------
             SectionCaption("Reminders")
-            SettingsCard {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SettingsCard(contentPadding = 0.dp) {
+                Column {
                     val notifPermission = if (android.os.Build.VERSION.SDK_INT >=
                         android.os.Build.VERSION_CODES.TIRAMISU
                     ) {
@@ -225,7 +267,7 @@ fun SettingsScreen(
                         },
                     )
                     if (settings.reminders.enabled) {
-                        // Reminders per day stepper
+                        Divider()
                         StepperRow(
                             icon = Icons.Outlined.Schedule,
                             label = "Reminders per day",
@@ -236,6 +278,7 @@ fun SettingsScreen(
                                 viewModel.setReminderTimesPerDay(it)
                             },
                         )
+                        Divider()
                         TimeRow(
                             label = if (settings.reminders.timesPerDay == 1) "Reminder time"
                             else "First reminder",
@@ -247,6 +290,7 @@ fun SettingsScreen(
                             context = context,
                         )
                         if (settings.reminders.timesPerDay > 1) {
+                            Divider()
                             TimeRow(
                                 label = "Last reminder",
                                 time = settings.reminders.lastTime,
@@ -359,6 +403,15 @@ fun SettingsScreen(
                     )
                     Divider()
                     NavRow(
+                        icon = Icons.Outlined.NotificationsActive,
+                        label = "Reminders for Habits",
+                        onClick = {
+                            haptics.light()
+                            onOpenHabitReminders()
+                        },
+                    )
+                    Divider()
+                    NavRow(
                         icon = Icons.Outlined.Upload,
                         label = "Export to JSON",
                         onClick = {
@@ -380,8 +433,8 @@ fun SettingsScreen(
 
             // NFC -----------------------------------------------------------
             SectionCaption("NFC tag scans")
-            SettingsCard {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SettingsCard(contentPadding = 0.dp) {
+                Column {
                     NfcActionRow(
                         selected = settings.nfcAction,
                         onChange = {
@@ -389,6 +442,7 @@ fun SettingsScreen(
                             viewModel.setNfcAction(it)
                         },
                     )
+                    Divider()
                     NavRowCompact(
                         icon = Icons.Outlined.Nfc,
                         label = "Write a tag",
@@ -402,28 +456,24 @@ fun SettingsScreen(
 
             // About ---------------------------------------------------------
             SectionCaption("About")
-            SettingsCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
+            SettingsCard(contentPadding = 0.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = "v${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = "v${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -432,6 +482,14 @@ fun SettingsScreen(
 }
 
 // --- Building blocks -------------------------------------------------------
+
+/**
+ * Shared minimum height for every row in a SettingsCard. Picking a single
+ * value (rather than letting padding drive the height) means a switch row
+ * (whose Switch is ~32dp), a chevron nav row (whose text is ~24dp), and
+ * the week-start row (text + small accent value) all line up exactly.
+ */
+private val SETTINGS_ROW_MIN_HEIGHT = 56.dp
 
 @Composable
 private fun SectionCaption(text: String) {
@@ -465,11 +523,13 @@ private fun ThemePickerRow(
     selected: ThemeMode,
     onChange: (ThemeMode) -> Unit,
 ) {
-    Column {
+    // Wrapped in identical horizontal/vertical padding to the rest of
+    // the rows in zero-padded SettingsCards. Title text sits where a
+    // row label would, the chip row underneath fills the rest.
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
         Text(
             text = "Theme",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(10.dp))
@@ -546,25 +606,19 @@ private fun CompactSwitchRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    icon: ImageVector? = null,
 ) {
+    // All rows in a unified card are pinned to the same minimum height
+    // so toggles, nav rows, and the week-start row line up exactly.
+    // Vertical padding is small (4dp) because the Switch + bodyLarge
+    // already fill ~48dp; heightIn handles the rest.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .heightIn(min = SETTINGS_ROW_MIN_HEIGHT)
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-        }
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
@@ -586,18 +640,12 @@ private fun WeekStartNavRow(selected: WeekStart, onChange: (WeekStart) -> Unit) 
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = SETTINGS_ROW_MIN_HEIGHT)
             .clickable {
                 onChange(if (selected == WeekStart.Monday) WeekStart.Sunday else WeekStart.Monday)
             }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.CalendarMonth,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(14.dp))
         Text(
             text = "Week starts on",
             style = MaterialTheme.typography.bodyLarge,
@@ -615,22 +663,12 @@ private fun WeekStartNavRow(selected: WeekStart, onChange: (WeekStart) -> Unit) 
 
 @Composable
 private fun NfcActionRow(selected: NfcAction, onChange: (NfcAction) -> Unit) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.Nfc,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "When you scan a tag",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Text(
+            text = "When you scan a tag",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ChipChoice("Background", selected == NfcAction.Background, Modifier.weight(1f)) {
@@ -686,27 +724,18 @@ private fun SwitchRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(14.dp))
+    @Suppress("UNUSED_PARAMETER") val unused = icon
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (subtitle != null) {
@@ -730,22 +759,13 @@ private fun StepperRow(
     max: Int,
     onChange: (Int) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(14.dp))
+    @Suppress("UNUSED_PARAMETER") val unused = icon
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
@@ -785,15 +805,13 @@ private fun TimeRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .clickable {
                 TimePickerDialog(context, { _, h, m ->
                     onPick(LocalTime.of(h, m).toString())
                 }, parsed.hour, parsed.minute, true).show()
             }
-            .padding(vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Spacer(Modifier.width(48.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
@@ -821,32 +839,22 @@ private fun NavRow(
     label: String,
     onClick: () -> Unit,
 ) {
+    // Icon parameter is kept for source-compat with existing call sites
+    // (and so the room is there if we re-introduce iconography later)
+    // but is intentionally not rendered — the goal is a text-first,
+    // uncluttered look that matches the toggle rows.
+    @Suppress("UNUSED_PARAMETER") val unused = icon
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = SETTINGS_ROW_MIN_HEIGHT)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(14.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
@@ -860,33 +868,18 @@ private fun NavRow(
 
 @Composable
 private fun NavRowCompact(icon: ImageVector, label: String, onClick: () -> Unit) {
+    @Suppress("UNUSED_PARAMETER") val unused = icon
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .heightIn(min = SETTINGS_ROW_MIN_HEIGHT)
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(14.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )

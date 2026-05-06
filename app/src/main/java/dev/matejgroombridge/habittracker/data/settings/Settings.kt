@@ -44,6 +44,22 @@ data class Settings(
      * may have intentionally cleaned house in the meantime.
      */
     val dailyHabitsOnly: Boolean = false,
+    /**
+     * "Zen mode" — collapses the entire app down to a single screen of
+     * habit cards that can be tapped to mark complete. Hides:
+     *   * The bottom navigation (Today is the only page).
+     *   * The FAB and "Create" entry points.
+     *   * The settings/archive icons in the Today top-app-bar.
+     *   * Long-press habit overview, edit dialog, and any other modals.
+     *   * Past Week, All Time, Reorder, Archived screens.
+     *   * The home-screen widget's tap-to-complete? — no, the widget is
+     *     external and continues to work; only in-app surfaces lock.
+     *
+     * The only other thing the user can do while Zen mode is on is open
+     * Settings (via the gear icon in the bottom corner) and toggle Zen
+     * back off again. All other settings rows are hidden.
+     */
+    val zenMode: Boolean = false,
 )
 
 /**
