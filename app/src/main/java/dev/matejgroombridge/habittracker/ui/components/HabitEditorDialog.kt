@@ -102,6 +102,14 @@ fun HabitEditorDialog(
      * — the NFC card is hidden until the habit has an id.
      */
     onWriteNfc: (() -> Unit)? = null,
+    /**
+     * When `true`, the frequency picker only exposes the Daily option.
+     * Honoured when the global "Daily habits only" setting is on so the
+     * user can't create a habit that would immediately violate it.
+     * Existing non-daily habits opened in edit mode also lock to Daily
+     * to keep state consistent.
+     */
+    dailyOnly: Boolean = false,
 ) {
     val isEdit = existing != null
 
@@ -231,6 +239,7 @@ fun HabitEditorDialog(
                         onIntervalChange = { intervalDays = it.coerceIn(1, 30) },
                         timesPerWeek = timesPerWeek,
                         onTimesPerWeekChange = { timesPerWeek = it.coerceIn(1, 7) },
+                        dailyOnly = dailyOnly,
                     )
                 }
 
@@ -515,7 +524,38 @@ private fun FrequencyPicker(
     onIntervalChange: (Int) -> Unit,
     timesPerWeek: Int,
     onTimesPerWeekChange: (Int) -> Unit,
+    dailyOnly: Boolean = false,
 ) {
+    // When the dailyOnly setting is on, the host may have opened an existing
+    // non-daily habit. Snap the local UI back to Daily as a defensive measure
+    // so the picker reflects what will actually be saved.
+    androidx.compose.runtime.LaunchedEffect(dailyOnly) {
+        if (dailyOnly && kind != FrequencyKind.Daily) onKindChange(FrequencyKind.Daily)
+    }
+    if (dailyOnly) {
+        // Single-card display so the picker still has visual presence; no
+        // tap target needed since Daily is the only option.
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Daily (only option)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+        return
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // Row 1 — Daily, Weekly
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

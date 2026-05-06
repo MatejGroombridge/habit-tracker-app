@@ -135,6 +135,7 @@ fun HomeScreen(
         is HomeDialog.Create -> HabitEditorDialog(
             existing = null,
             onDismiss = { dialog = null },
+            dailyOnly = settings.dailyHabitsOnly,
             onResult = { result ->
                 if (result is HabitEditorResult.Save) {
                     viewModel.addHabit(
@@ -168,6 +169,11 @@ fun HomeScreen(
                 onTogglePause = {
                     viewModel.setPaused(habitId = live.id, paused = !live.isPaused)
                 },
+                // Hide skip / pause icons when their global toggles are
+                // off — there's no point exposing actions the user has
+                // explicitly opted out of.
+                showSkipAction = settings.allowSkips,
+                showPauseAction = settings.allowPauses,
                 // Only show the per-habit reminder toggle when global
                 // reminders are on — otherwise it has no effect.
                 showRemindersToggle = settings.reminders.enabled,
@@ -179,6 +185,7 @@ fun HomeScreen(
         is HomeDialog.Edit -> HabitEditorDialog(
             existing = d.habit,
             onDismiss = { dialog = null },
+            dailyOnly = settings.dailyHabitsOnly,
             onWriteNfc = {
                 dialog = null
                 onOpenWriteNfc()

@@ -14,6 +14,36 @@ data class Settings(
     val nfcAction: NfcAction = NfcAction.Default,
     val weekStart: WeekStart = WeekStart.Default,
     val reminders: ReminderSettings = ReminderSettings(),
+    /**
+     * When `true` the user can swipe horizontally between Today / Past Week
+     * / All Time. When `false` the pager only responds to bottom-bar taps,
+     * which is useful for users who find swipe gestures conflict with
+     * other UI like the All-Time grid scroll.
+     */
+    val swipeToNavigate: Boolean = true,
+    /**
+     * Master switch for the per-day Skip action. When `false`, the
+     * "Skip today" icon is hidden from the habit overview dialog and the
+     * Past Week long-press menu, and the [Habit.skipsPerWeek] field is
+     * ignored. Existing skipped days remain in storage so toggling back
+     * on restores the previous behaviour with no data loss.
+     */
+    val allowSkips: Boolean = true,
+    /**
+     * Master switch for habit pausing. When `false`, the Pause icon is
+     * hidden from the habit overview dialog and the Past Week long-press
+     * menu. As with [allowSkips], existing pause state is preserved in
+     * storage; toggling back on restores it untouched.
+     */
+    val allowPauses: Boolean = true,
+    /**
+     * When `true` the app treats only Daily-frequency habits as visible.
+     * Any habit whose frequency is Weekly / TimesPerWeek / EveryNDays is
+     * automatically archived. Toggling back to `false` does not unarchive
+     * — the user can do that manually from the Archive screen, since some
+     * may have intentionally cleaned house in the meantime.
+     */
+    val dailyHabitsOnly: Boolean = false,
 )
 
 /**

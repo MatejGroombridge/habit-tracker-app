@@ -265,10 +265,19 @@ private fun ContributionGrid(
             scrollState.scrollTo(scrollState.maxValue)
         }
 
+        // Only attach horizontalScroll when the content actually overflows
+        // the available width. Otherwise the modifier still consumes horizontal
+        // drag gestures via nested-scroll dispatch, which on the All-Time
+        // page makes it hard to swipe across to the Today page when the
+        // grid hasn't accumulated enough history to need scrolling.
+        val needsScroll = weeksAvailable > columnsThatFit
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(scrollState)
+                .then(
+                    if (needsScroll) Modifier.horizontalScroll(scrollState)
+                    else Modifier,
+                )
                 .padding(start = GRID_LEFT_PADDING, end = GRID_RIGHT_PADDING),
             // The right padding above provides the small breathing space on
             // the right; columns themselves use `Arrangement.End` so the

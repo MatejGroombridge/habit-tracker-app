@@ -103,6 +103,28 @@ class HomeViewModel(
         viewModelScope.launch { repository.setIncludeInReminders(habitId, include) }
     }
 
+    /**
+     * Returns the names of currently-active habits whose frequency is not
+     * Daily. Used to populate the "Are you sure?" confirmation when the
+     * user enables the global daily-habits-only toggle.
+     */
+    fun nonDailyActiveHabitNames(): List<String> = uiState.value.activeHabits
+        .filter { it.frequency !is dev.matejgroombridge.habittracker.data.model.HabitFrequency.Daily }
+        .map { it.name }
+
+    /**
+     * Archives every non-daily active habit in one batch. Idempotent — if
+     * called when there are no non-daily habits the underlying setArchived
+     * calls all become no-ops.
+     */
+    fun archiveNonDailyHabits() {
+        viewModelScope.launch {
+            uiState.value.activeHabits
+                .filter { it.frequency !is dev.matejgroombridge.habittracker.data.model.HabitFrequency.Daily }
+                .forEach { repository.setArchived(it.id, true) }
+        }
+    }
+
     fun setArchived(habitId: String, archived: Boolean) {
         viewModelScope.launch { repository.setArchived(habitId, archived) }
     }

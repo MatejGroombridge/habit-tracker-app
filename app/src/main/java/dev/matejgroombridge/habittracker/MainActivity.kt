@@ -229,6 +229,7 @@ private fun MainPager(
     )
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
 
     // Light buzz whenever the pager actually settles on a new page (whether
     // initiated by a swipe or a tab tap). We snapshot the previous page so
@@ -292,11 +293,18 @@ private fun MainPager(
             // instant; setting beyondViewportPageCount to 1 means at most
             // 3 pages exist at once which is fine for our screens.
             beyondViewportPageCount = 1,
+            // Honour the "Swipe to navigate" general setting. When false,
+            // the pager only responds to programmatic scrolls (i.e. the
+            // bottom-bar tap → animateScrollToPage path above). The user
+            // can still tap tabs to switch pages.
+            userScrollEnabled = settings.swipeToNavigate,
         ) { page ->
             when (page) {
                 0 -> PastWeekScreen(
                     viewModel = homeViewModel,
                     contentPadding = padding,
+                    allowSkips = settings.allowSkips,
+                    allowPauses = settings.allowPauses,
                 )
                 TODAY_PAGE_INDEX -> HomeScreen(
                     viewModel = homeViewModel,

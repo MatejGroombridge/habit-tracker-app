@@ -51,8 +51,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -181,7 +183,7 @@ fun SettingsScreen(
                         icon = Icons.Outlined.Brightness3,
                         label = "AMOLED dark mode",
                         checked = settings.amoled,
-                        onChange = {
+                        onCheckedChange = {
                             haptics.light()
                             viewModel.setAmoled(it)
                         },
@@ -264,8 +266,72 @@ fun SettingsScreen(
             // export, import. Keeps the page from sprawling and matches what
             // a user expects under a "general" heading.
             SectionCaption("General")
+
+            // Single card holding both the behaviour toggles and the
+            // simple nav rows — keeps "General" as one visual unit
+            // instead of two stacked panels.
+            var pendingDailyOnly by remember { mutableStateOf(false) }
+            if (pendingDailyOnly) {
+                DailyOnlyConfirmDialog(
+                    nonDailyHabitNames = homeViewModel.nonDailyActiveHabitNames(),
+                    onConfirm = {
+                        homeViewModel.archiveNonDailyHabits()
+                        viewModel.setDailyHabitsOnly(true)
+                        pendingDailyOnly = false
+                    },
+                    onDismiss = { pendingDailyOnly = false },
+                )
+            }
             SettingsCard(contentPadding = 0.dp) {
                 Column {
+                    CompactSwitchRow(
+                        label = "Swipe to navigate",
+                        checked = settings.swipeToNavigate,
+                        onCheckedChange = {
+                            haptics.light()
+                            viewModel.setSwipeToNavigate(it)
+                        },
+                    )
+                    Divider()
+                    CompactSwitchRow(
+                        label = "Allow skips",
+                        checked = settings.allowSkips,
+                        onCheckedChange = {
+                            haptics.light()
+                            viewModel.setAllowSkips(it)
+                        },
+                    )
+                    Divider()
+                    CompactSwitchRow(
+                        label = "Allow pauses",
+                        checked = settings.allowPauses,
+                        onCheckedChange = {
+                            haptics.light()
+                            viewModel.setAllowPauses(it)
+                        },
+                    )
+                    Divider()
+                    CompactSwitchRow(
+                        label = "Daily habits only",
+                        checked = settings.dailyHabitsOnly,
+                        onCheckedChange = { newValue ->
+                            haptics.light()
+                            if (newValue) {
+                                // Don't flip the toggle yet — wait for the
+                                // user to confirm in the warning dialog,
+                                // which then archives + sets the flag.
+                                val nonDaily = homeViewModel.nonDailyActiveHabitNames()
+                                if (nonDaily.isEmpty()) {
+                                    viewModel.setDailyHabitsOnly(true)
+                                } else {
+                                    pendingDailyOnly = true
+                                }
+                            } else {
+                                viewModel.setDailyHabitsOnly(false)
+                            }
+                        },
+                    )
+                    Divider()
                     WeekStartNavRow(
                         selected = settings.weekStart,
                         onChange = {
@@ -477,33 +543,35 @@ private fun ThemeButton(
  */
 @Composable
 private fun CompactSwitchRow(
-    icon: ImageVector,
     label: String,
     checked: Boolean,
-    onChange: (Boolean) -> Unit,
+    onCheckedChange: (Boolean) -> Unit,
+    icon: ImageVector? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onChange(!checked) }
-            .padding(vertical = 6.dp),
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(12.dp))
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+        }
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -828,6 +896,58 @@ private fun NavRowCompact(icon: ImageVector, label: String, onClick: () -> Unit)
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * Confirmation modal shown when the user enables "Daily habits only" while
+ * one or more non-daily habits exist. Lists the affected habits so the
+ * user knows exactly what's about to be archived.
+ */
+@Composable
+private fun DailyOnlyConfirmDialog(
+    nonDailyHabitNames: List<String>,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Archive non-daily habits?") },
+        text = {
+            Column {
+                Text(
+                    text = "Turning on \"Daily habits only\" will archive any " +
+                        "habit that isn't daily. They'll move to the Archive " +
+                        "screen — none of their data will be lost, and you " +
+                        "can unarchive them later if you change your mind.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Habits to archive (${nonDailyHabitNames.size}):",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(4.dp))
+                nonDailyHabitNames.forEach { name ->
+                    Text(
+                        text = "• $name",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text("Archive")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable

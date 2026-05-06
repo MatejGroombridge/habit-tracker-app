@@ -73,6 +73,28 @@ class SettingsViewModel(
         }
     }
 
+    fun setSwipeToNavigate(enabled: Boolean) {
+        viewModelScope.launch { repository.setSwipeToNavigate(enabled) }
+    }
+
+    fun setAllowSkips(enabled: Boolean) {
+        viewModelScope.launch { repository.setAllowSkips(enabled) }
+    }
+
+    fun setAllowPauses(enabled: Boolean) {
+        viewModelScope.launch { repository.setAllowPauses(enabled) }
+    }
+
+    /**
+     * Sets the dailyHabitsOnly toggle. When [enabled] is true, the caller
+     * is responsible for archiving any non-daily habits — see
+     * [HomeViewModel.archiveNonDailyHabits], invoked from the confirmation
+     * dialog in SettingsScreen.
+     */
+    fun setDailyHabitsOnly(enabled: Boolean) {
+        viewModelScope.launch { repository.setDailyHabitsOnly(enabled) }
+    }
+
     companion object {
         fun factory(application: Application): ViewModelProvider.Factory = viewModelFactory {
             initializer {

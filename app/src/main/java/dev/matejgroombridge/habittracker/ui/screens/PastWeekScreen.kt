@@ -66,6 +66,10 @@ import java.util.Locale
 fun PastWeekScreen(
     viewModel: HomeViewModel,
     contentPadding: PaddingValues,
+    /** Hide the Skip option in the long-press menu when global allowSkips is off. */
+    allowSkips: Boolean = true,
+    /** Hide the Pause option in the long-press menu when global allowPauses is off. */
+    allowPauses: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
@@ -108,6 +112,8 @@ fun PastWeekScreen(
                     habit = habit,
                     days = days,
                     today = today,
+                    allowSkips = allowSkips,
+                    allowPauses = allowPauses,
                     onTapDay = { day ->
                         // Tap = toggle completion (existing behaviour). If
                         // the day is currently skipped or paused, clear
@@ -165,6 +171,8 @@ private fun PastWeekRow(
     habit: Habit,
     days: List<Long>,
     today: Long,
+    allowSkips: Boolean,
+    allowPauses: Boolean,
     onTapDay: (Long) -> Unit,
     onPickStateForDay: (Long, DayState) -> Unit,
 ) {
@@ -218,6 +226,8 @@ private fun PastWeekRow(
                         isToday = epochDay == today,
                         accent = color.accent,
                         onColor = color.contentColor(),
+                        allowSkips = allowSkips,
+                        allowPauses = allowPauses,
                         onClick = { onTapDay(epochDay) },
                         onPick = { state -> onPickStateForDay(epochDay, state) },
                     )
@@ -238,6 +248,8 @@ private fun DayChip(
     isToday: Boolean,
     accent: Color,
     onColor: Color,
+    allowSkips: Boolean,
+    allowPauses: Boolean,
     onClick: () -> Unit,
     onPick: (DayState) -> Unit,
 ) {
@@ -283,16 +295,20 @@ private fun DayChip(
                     icon = Icons.Outlined.Check,
                     onClick = { menuOpen = false; onPick(DayState.Completed) },
                 )
-                MenuChoice(
-                    label = "Mark Skipped",
-                    icon = Icons.Outlined.SkipNext,
-                    onClick = { menuOpen = false; onPick(DayState.Skipped) },
-                )
-                MenuChoice(
-                    label = if (isPaused) "Resume Habit" else "Pause Habit",
-                    icon = Icons.Outlined.Pause,
-                    onClick = { menuOpen = false; onPick(DayState.Pause) },
-                )
+                if (allowSkips) {
+                    MenuChoice(
+                        label = "Mark Skipped",
+                        icon = Icons.Outlined.SkipNext,
+                        onClick = { menuOpen = false; onPick(DayState.Skipped) },
+                    )
+                }
+                if (allowPauses) {
+                    MenuChoice(
+                        label = if (isPaused) "Resume Habit" else "Pause Habit",
+                        icon = Icons.Outlined.Pause,
+                        onClick = { menuOpen = false; onPick(DayState.Pause) },
+                    )
+                }
                 MenuChoice(
                     label = "Clear",
                     icon = Icons.Outlined.Close,

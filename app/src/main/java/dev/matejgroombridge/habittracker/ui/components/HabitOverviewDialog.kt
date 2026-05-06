@@ -71,6 +71,10 @@ fun HabitOverviewDialog(
     onEdit: () -> Unit,
     onToggleSkipToday: () -> Unit = {},
     onTogglePause: () -> Unit = {},
+    /** Hide the Skip icon when the global "Allow skips" toggle is off. */
+    showSkipAction: Boolean = true,
+    /** Hide the Pause icon when the global "Allow pauses" toggle is off. */
+    showPauseAction: Boolean = true,
     /**
      * Whether to expose the per-habit "include in reminders" toggle.
      * Pass `false` (or just omit) when the global daily-reminders setting
@@ -140,21 +144,25 @@ fun HabitOverviewDialog(
                     // top — the body of the dialog now reads as pure stats.
                     // Active states tint with the habit's accent so the
                     // user can see at a glance what's currently set.
-                    HeaderActionIcon(
-                        icon = Icons.Outlined.SkipNext,
-                        contentDescription = if (habit.isSkippedOn(todayEpochDay)) "Unskip today"
-                        else "Skip today",
-                        active = habit.isSkippedOn(todayEpochDay),
-                        accent = color.accent,
-                        onClick = onToggleSkipToday,
-                    )
-                    HeaderActionIcon(
-                        icon = if (habit.isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
-                        contentDescription = if (habit.isPaused) "Resume habit" else "Pause habit",
-                        active = habit.isPaused,
-                        accent = color.accent,
-                        onClick = onTogglePause,
-                    )
+                    if (showSkipAction) {
+                        HeaderActionIcon(
+                            icon = Icons.Outlined.SkipNext,
+                            contentDescription = if (habit.isSkippedOn(todayEpochDay)) "Unskip today"
+                            else "Skip today",
+                            active = habit.isSkippedOn(todayEpochDay),
+                            accent = color.accent,
+                            onClick = onToggleSkipToday,
+                        )
+                    }
+                    if (showPauseAction) {
+                        HeaderActionIcon(
+                            icon = if (habit.isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                            contentDescription = if (habit.isPaused) "Resume habit" else "Pause habit",
+                            active = habit.isPaused,
+                            accent = color.accent,
+                            onClick = onTogglePause,
+                        )
+                    }
                     IconButton(onClick = onEdit) {
                         Icon(
                             imageVector = Icons.Outlined.Edit,

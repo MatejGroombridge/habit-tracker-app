@@ -33,7 +33,29 @@ class SettingsRepository(private val context: Context) {
                 firstTime = prefs[KEY_REMINDER_FIRST_TIME] ?: "09:00",
                 lastTime = prefs[KEY_REMINDER_LAST_TIME] ?: "20:00",
             ),
+            // New General toggles default to "previous behaviour" so existing
+            // installs see no change at upgrade time.
+            swipeToNavigate = prefs[KEY_SWIPE_TO_NAVIGATE] ?: true,
+            allowSkips = prefs[KEY_ALLOW_SKIPS] ?: true,
+            allowPauses = prefs[KEY_ALLOW_PAUSES] ?: true,
+            dailyHabitsOnly = prefs[KEY_DAILY_HABITS_ONLY] ?: false,
         )
+    }
+
+    suspend fun setSwipeToNavigate(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_SWIPE_TO_NAVIGATE] = enabled }
+    }
+
+    suspend fun setAllowSkips(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_SKIPS] = enabled }
+    }
+
+    suspend fun setAllowPauses(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_PAUSES] = enabled }
+    }
+
+    suspend fun setDailyHabitsOnly(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_DAILY_HABITS_ONLY] = enabled }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -91,5 +113,9 @@ class SettingsRepository(private val context: Context) {
         val KEY_REMINDER_TIMES_PER_DAY = intPreferencesKey("reminder_times_per_day")
         val KEY_REMINDER_FIRST_TIME = stringPreferencesKey("reminder_first_time")
         val KEY_REMINDER_LAST_TIME = stringPreferencesKey("reminder_last_time")
+        val KEY_SWIPE_TO_NAVIGATE = booleanPreferencesKey("swipe_to_navigate")
+        val KEY_ALLOW_SKIPS = booleanPreferencesKey("allow_skips")
+        val KEY_ALLOW_PAUSES = booleanPreferencesKey("allow_pauses")
+        val KEY_DAILY_HABITS_ONLY = booleanPreferencesKey("daily_habits_only")
     }
 }
