@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.0.1 — 2026-05-06
+
+Added feature toggles to settings
+
+
 ## v2.0.0 — 2026-05-05
 
 Major feature & UI updates + Habits widget"
