@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.1.0 — 2026-05-06
+
+Settings cleanup + Zen mode
+
+
 ## v2.0.1 — 2026-05-06
 
 Added feature toggles to settings
