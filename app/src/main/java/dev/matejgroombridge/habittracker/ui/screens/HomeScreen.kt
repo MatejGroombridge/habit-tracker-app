@@ -84,7 +84,10 @@ fun HomeScreen(
     // (not the initial state), so opening the app on an already-complete day
     // doesn't trigger a redundant burst.
     val allComplete = state.activeHabits.isNotEmpty() &&
-        state.activeHabits.all { it.isVisuallyCompletedOn(state.todayEpochDay, settings.weekStart.dayOfWeek) }
+        state.activeHabits.all { habit ->
+            val displayHabit = if (settings.allowInverseHabits) habit else habit.copy(inverse = false)
+            displayHabit.isVisuallyCompletedOn(state.todayEpochDay, settings.weekStart.dayOfWeek)
+        }
     var previousAllComplete by remember { mutableStateOf<Boolean?>(null) }
     var fireConfetti by remember { mutableStateOf(false) }
     LaunchedEffect(allComplete) {
@@ -129,6 +132,7 @@ fun HomeScreen(
                         onLongPress = if (settings.zenMode) ({ _ -> })
                         else ({ habit -> dialog = HomeDialog.Overview(habit) }),
                         weekStart = settings.weekStart,
+                        allowInverseHabits = settings.allowInverseHabits,
                     )
                 }
             }
@@ -146,6 +150,7 @@ fun HomeScreen(
             existing = null,
             onDismiss = { dialog = null },
             dailyOnly = settings.dailyHabitsOnly,
+            allowInverseHabits = settings.allowInverseHabits,
             onResult = { result ->
                 if (result is HabitEditorResult.Save) {
                     viewModel.addHabit(
@@ -154,6 +159,7 @@ fun HomeScreen(
                         iconKey = result.iconKey,
                         colorKey = result.colorKey,
                         frequency = result.frequency,
+                        inverse = result.inverse,
                     )
                 }
                 dialog = null
@@ -164,8 +170,9 @@ fun HomeScreen(
             // stay live if completion changes (e.g. via NFC) while the
             // dialog is open.
             val live = state.activeHabits.firstOrNull { it.id == d.habit.id } ?: d.habit
+            val displayHabit = if (settings.allowInverseHabits) live else live.copy(inverse = false)
             HabitOverviewDialog(
-                habit = live,
+                habit = displayHabit,
                 todayEpochDay = state.todayEpochDay,
                 onDismiss = { dialog = null },
                 onEdit = { dialog = HomeDialog.Edit(live) },
@@ -190,6 +197,7 @@ fun HomeScreen(
             existing = d.habit,
             onDismiss = { dialog = null },
             dailyOnly = settings.dailyHabitsOnly,
+            allowInverseHabits = settings.allowInverseHabits,
             onWriteNfc = {
                 dialog = null
                 onOpenWriteNfc()
@@ -203,6 +211,7 @@ fun HomeScreen(
                         iconKey = result.iconKey,
                         colorKey = result.colorKey,
                         frequency = result.frequency,
+                        inverse = result.inverse,
                     )
                     is HabitEditorResult.Archive -> viewModel.setArchived(d.habit.id, result.archived)
                 }
@@ -273,6 +282,7 @@ private fun HabitsGrid(
     onToggle: (String) -> Unit,
     onLongPress: (Habit) -> Unit,
     weekStart: dev.matejgroombridge.habittracker.data.settings.WeekStart,
+    allowInverseHabits: Boolean,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -293,6 +303,7 @@ private fun HabitsGrid(
                 onClick = { onToggle(habit.id) },
                 onLongClick = { onLongPress(habit) },
                 weekStart = weekStart,
+                allowInverseHabits = allowInverseHabits,
             )
         }
     }

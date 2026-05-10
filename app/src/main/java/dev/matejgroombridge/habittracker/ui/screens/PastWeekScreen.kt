@@ -70,6 +70,8 @@ fun PastWeekScreen(
     allowSkips: Boolean = true,
     /** Hide the Pause option in the long-press menu when global allowPauses is off. */
     allowPauses: Boolean = true,
+    /** When false, render stored inverse habits as normal habits without deleting their flag. */
+    allowInverseHabits: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
@@ -108,8 +110,9 @@ fun PastWeekScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items = state.activeHabits, key = { it.id }) { habit ->
+                val displayHabit = if (allowInverseHabits) habit else habit.copy(inverse = false)
                 PastWeekRow(
-                    habit = habit,
+                    habit = displayHabit,
                     days = days,
                     today = today,
                     allowSkips = allowSkips,
@@ -118,14 +121,22 @@ fun PastWeekScreen(
                         // Tap = toggle completion (existing behaviour). If
                         // the day is currently skipped or paused, clear
                         // those first so the toggle has a sensible target.
-                        if (habit.isSkippedOn(day)) {
-                            viewModel.setSkipped(habit.id, day, false)
+                        if (displayHabit.isSkippedOn(day)) {
+                            viewModel.setSkipped(displayHabit.id, day, false)
                         } else {
-                            viewModel.setCompleted(habit.id, day, !habit.isCompletedOn(day))
+                            // For inverse habits, completedDays means "the bad
+                            // habit happened". Tapping a successful/default day
+                            // records an occurrence; tapping that occurrence
+                            // clears it back to success.
+                            viewModel.setCompleted(
+                                displayHabit.id,
+                                day,
+                                !displayHabit.isCompletedOn(day),
+                            )
                         }
                     },
                     onPickStateForDay = { day, state ->
-                        viewModel.applyDayState(habit, day, state)
+                        viewModel.applyDayState(displayHabit, day, state)
                     },
                 )
             }
@@ -219,7 +230,7 @@ private fun PastWeekRow(
                 days.forEach { epochDay ->
                     DayChip(
                         date = LocalDate.ofEpochDay(epochDay),
-                        completed = habit.isCompletedOn(epochDay),
+                        completed = habit.isSuccessfulOn(epochDay),
                         skipped = habit.isSkippedOn(epochDay),
                         paused = habit.pausedSinceEpochDay != null && epochDay >= habit.pausedSinceEpochDay,
                         isPaused = habit.isPaused,

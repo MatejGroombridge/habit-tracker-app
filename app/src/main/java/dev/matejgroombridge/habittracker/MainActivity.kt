@@ -327,6 +327,7 @@ private fun MainPager(
                     contentPadding = padding,
                     allowSkips = settings.allowSkips,
                     allowPauses = settings.allowPauses,
+                    allowInverseHabits = settings.allowInverseHabits,
                 )
                 TODAY_PAGE_INDEX -> HomeScreen(
                     viewModel = homeViewModel,
@@ -341,6 +342,7 @@ private fun MainPager(
                 2 -> AnalyticsScreen(
                     viewModel = homeViewModel,
                     contentPadding = padding,
+                    allowInverseHabits = settings.allowInverseHabits,
                 )
             }
         }

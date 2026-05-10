@@ -57,13 +57,15 @@ fun HabitCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     weekStart: WeekStart = WeekStart.Default,
+    allowInverseHabits: Boolean = true,
 ) {
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
     val haptics = rememberHaptics()
 
-    val markedToday = habit.isCompletedOn(todayEpochDay)
-    val visuallyCompleted = habit.isVisuallyCompletedOn(todayEpochDay)
+    val displayHabit = if (allowInverseHabits) habit else habit.copy(inverse = false)
+    val markedToday = displayHabit.isCompletedOn(todayEpochDay)
+    val visuallyCompleted = displayHabit.isVisuallyCompletedOn(todayEpochDay, weekStart.dayOfWeek)
 
     val baseContainer = color.containerColor()
     val baseContent = color.contentColor()
@@ -120,7 +122,7 @@ fun HabitCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 HabitSubtitle(
-                    habit = habit,
+                    habit = displayHabit,
                     today = todayEpochDay,
                     markedToday = markedToday,
                     visuallyCompleted = visuallyCompleted,

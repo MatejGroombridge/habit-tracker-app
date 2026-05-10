@@ -57,8 +57,27 @@ data class Habit(
      * or doesn't want to be nagged about.
      */
     val includeInReminders: Boolean = true,
+    /**
+     * Inverse habits are for breaking bad habits. They start each day in a
+     * visually-completed / successful state. If the user does the thing
+     * they're trying to avoid, tapping the card records that day in
+     * [completedDays] as an occurrence/failure, which makes the habit look
+     * incomplete for that day.
+     *
+     * We intentionally reuse [completedDays] rather than adding another set:
+     * for normal habits it means "completed", for inverse habits it means
+     * "bad habit occurred". This keeps migration tiny and preserves the
+     * existing JSON shape with a single new boolean defaulting to false.
+     */
+    val inverse: Boolean = false,
 ) {
     fun isCompletedOn(epochDay: Long): Boolean = epochDay in completedDays
+
+    /** Whether this day has been resolved successfully for streak/stat purposes. */
+    fun isSuccessfulOn(epochDay: Long): Boolean {
+        if (epochDay < createdAtEpochDay) return false
+        return if (inverse) epochDay !in completedDays else epochDay in completedDays
+    }
     fun isSkippedOn(epochDay: Long): Boolean = epochDay in skippedDays
     val isPaused: Boolean get() = pausedSinceEpochDay != null
 
@@ -82,7 +101,7 @@ data class Habit(
     fun currentStreak(today: Long): Long {
         var streak = 0L
         var day = today
-        while (day in completedDays) {
+        while (day >= createdAtEpochDay && isSuccessfulOn(day)) {
             streak++
             day--
         }
@@ -98,13 +117,31 @@ data class Habit(
      * sort and O(n) thereafter. Empty set → 0.
      */
     fun longestStreak(): Long {
-        if (completedDays.isEmpty()) return 0L
-        val sorted = completedDays.sorted()
-        var best = 1L
-        var run = 1L
-        for (i in 1 until sorted.size) {
-            run = if (sorted[i] == sorted[i - 1] + 1) run + 1 else 1L
-            if (run > best) best = run
+        if (!inverse) {
+            if (completedDays.isEmpty()) return 0L
+            val sorted = completedDays.sorted()
+            var best = 1L
+            var run = 1L
+            for (i in 1 until sorted.size) {
+                run = if (sorted[i] == sorted[i - 1] + 1) run + 1 else 1L
+                if (run > best) best = run
+            }
+            return best
+        }
+
+        // For inverse habits, success is the absence of an occurrence. Bound
+        // the scan to the tracking window so "infinite success before creation"
+        // doesn't exist.
+        val today = java.time.LocalDate.now().toEpochDay()
+        var best = 0L
+        var run = 0L
+        for (day in createdAtEpochDay..today) {
+            if (isSuccessfulOn(day)) {
+                run++
+                if (run > best) best = run
+            } else {
+                run = 0L
+            }
         }
         return best
     }
@@ -129,6 +166,7 @@ data class Habit(
         // skip-circles / pause-cells (those use isCompletedOn directly).
         if (day in skippedDays) return true
         if (pausedSinceEpochDay != null && day >= pausedSinceEpochDay) return true
+        if (inverse) return day !in completedDays
         if (day in completedDays) return true
         val window = when (val f = frequency) {
             HabitFrequency.Daily -> return false

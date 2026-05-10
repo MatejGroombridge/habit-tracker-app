@@ -85,6 +85,10 @@ class SettingsViewModel(
         viewModelScope.launch { repository.setAllowPauses(enabled) }
     }
 
+    fun setAllowInverseHabits(enabled: Boolean) {
+        viewModelScope.launch { repository.setAllowInverseHabits(enabled) }
+    }
+
     /**
      * Sets the dailyHabitsOnly toggle. When [enabled] is true, the caller
      * is responsible for archiving any non-daily habits — see

@@ -356,6 +356,15 @@ fun SettingsScreen(
                     )
                     Divider()
                     CompactSwitchRow(
+                        label = "Allow inverse habits",
+                        checked = settings.allowInverseHabits,
+                        onCheckedChange = {
+                            haptics.light()
+                            viewModel.setAllowInverseHabits(it)
+                        },
+                    )
+                    Divider()
+                    CompactSwitchRow(
                         label = "Daily habits only",
                         checked = settings.dailyHabitsOnly,
                         onCheckedChange = { newValue ->

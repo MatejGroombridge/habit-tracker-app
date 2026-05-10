@@ -83,9 +83,12 @@ fun HabitOverviewDialog(
         habit.currentStreak(todayEpochDay)
     }
     val topStreak = remember(habit.completedDays) { habit.longestStreak() }
-    val totalCompletions = habit.completedDays.size
+    val totalCompletions = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay, todayEpochDay) {
+        if (habit.inverse) (habit.createdAtEpochDay..todayEpochDay).count { habit.isSuccessfulOn(it) }
+        else habit.completedDays.size
+    }
     val daysSinceCreated = (todayEpochDay - habit.createdAtEpochDay).coerceAtLeast(0L)
-    val completionRate = remember(habit.completedDays, daysSinceCreated) {
+    val completionRate = remember(totalCompletions, daysSinceCreated) {
         // Use createdAtEpochDay as the denominator so a brand-new habit
         // doesn't read 0% on day zero — `+1` makes day-of-creation count
         // as one full day.
@@ -196,7 +199,7 @@ fun HabitOverviewDialog(
                         modifier = Modifier.weight(1f),
                     )
                     StatTile(
-                        label = "Total",
+                        label = if (habit.inverse) "Success" else "Total",
                         value = totalCompletions.toString(),
                         icon = Icons.Outlined.TaskAlt,
                         accent = color.accent,
@@ -352,7 +355,7 @@ private fun LastSevenDaysStrip(
         for (offset in 6 downTo 0) {
             val day = todayEpochDay - offset
             val date = LocalDate.ofEpochDay(day)
-            val completed = habit.isCompletedOn(day)
+            val completed = habit.isSuccessfulOn(day)
             val isToday = offset == 0
             DayCell(
                 label = dayLabel(date.dayOfWeek),

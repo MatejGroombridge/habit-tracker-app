@@ -37,6 +37,13 @@ data class Settings(
      */
     val allowPauses: Boolean = true,
     /**
+     * Master switch for inverse habits (bad-habit breaking). When `false`,
+     * the per-habit "Inverse habit" toggle is hidden from create/edit and
+     * existing inverse habits behave like normal habits in the UI without
+     * losing their stored inverse flag.
+     */
+    val allowInverseHabits: Boolean = true,
+    /**
      * When `true` the app treats only Daily-frequency habits as visible.
      * Any habit whose frequency is Weekly / TimesPerWeek / EveryNDays is
      * automatically archived. Toggling back to `false` does not unarchive

@@ -51,6 +51,7 @@ class HabitRepository(private val context: Context) {
         iconKey: String = Habit.DEFAULT_ICON_KEY,
         colorKey: String = Habit.DEFAULT_COLOR_KEY,
         frequency: HabitFrequency = HabitFrequency.Daily,
+        inverse: Boolean = false,
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
@@ -62,6 +63,7 @@ class HabitRepository(private val context: Context) {
                 colorKey = colorKey,
                 frequency = frequency,
                 createdAtEpochDay = todayEpochDay,
+                inverse = inverse,
             )
         }
     }
@@ -76,6 +78,7 @@ class HabitRepository(private val context: Context) {
         frequency: HabitFrequency,
         skipsPerWeek: Int = -1,
         includeInReminders: Boolean? = null,
+        inverse: Boolean? = null,
     ) {
         val trimmedName = name.trim()
         if (trimmedName.isEmpty()) return
@@ -91,6 +94,7 @@ class HabitRepository(private val context: Context) {
                         // -1 sentinel = "unchanged" so legacy callers don't need to pass it.
                         skipsPerWeek = if (skipsPerWeek < 0) h.skipsPerWeek else skipsPerWeek.coerceIn(0, 7),
                         includeInReminders = includeInReminders ?: h.includeInReminders,
+                        inverse = inverse ?: h.inverse,
                     )
                 } else h
             }

@@ -53,6 +53,7 @@ class HomeViewModel(
         iconKey: String,
         colorKey: String,
         frequency: HabitFrequency,
+        inverse: Boolean,
     ) {
         viewModelScope.launch {
             repository.addHabit(
@@ -62,6 +63,7 @@ class HomeViewModel(
                 iconKey = iconKey,
                 colorKey = colorKey,
                 frequency = frequency,
+                inverse = inverse,
             )
         }
     }
@@ -74,10 +76,12 @@ class HomeViewModel(
         colorKey: String,
         frequency: HabitFrequency,
         skipsPerWeek: Int = -1,
+        inverse: Boolean? = null,
     ) {
         viewModelScope.launch {
             repository.updateHabit(
-                habitId, name, description, iconKey, colorKey, frequency, skipsPerWeek
+                habitId, name, description, iconKey, colorKey, frequency, skipsPerWeek,
+                inverse = inverse,
             )
         }
     }

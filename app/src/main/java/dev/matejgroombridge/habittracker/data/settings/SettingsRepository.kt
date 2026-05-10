@@ -38,6 +38,7 @@ class SettingsRepository(private val context: Context) {
             swipeToNavigate = prefs[KEY_SWIPE_TO_NAVIGATE] ?: true,
             allowSkips = prefs[KEY_ALLOW_SKIPS] ?: true,
             allowPauses = prefs[KEY_ALLOW_PAUSES] ?: true,
+            allowInverseHabits = prefs[KEY_ALLOW_INVERSE_HABITS] ?: true,
             dailyHabitsOnly = prefs[KEY_DAILY_HABITS_ONLY] ?: false,
             zenMode = prefs[KEY_ZEN_MODE] ?: false,
         )
@@ -57,6 +58,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setAllowPauses(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_PAUSES] = enabled }
+    }
+
+    suspend fun setAllowInverseHabits(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_INVERSE_HABITS] = enabled }
     }
 
     suspend fun setDailyHabitsOnly(enabled: Boolean) {
@@ -121,6 +126,7 @@ class SettingsRepository(private val context: Context) {
         val KEY_SWIPE_TO_NAVIGATE = booleanPreferencesKey("swipe_to_navigate")
         val KEY_ALLOW_SKIPS = booleanPreferencesKey("allow_skips")
         val KEY_ALLOW_PAUSES = booleanPreferencesKey("allow_pauses")
+        val KEY_ALLOW_INVERSE_HABITS = booleanPreferencesKey("allow_inverse_habits")
         val KEY_DAILY_HABITS_ONLY = booleanPreferencesKey("daily_habits_only")
         val KEY_ZEN_MODE = booleanPreferencesKey("zen_mode")
     }

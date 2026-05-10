@@ -44,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,6 +72,7 @@ sealed interface HabitEditorResult {
         val iconKey: String,
         val colorKey: String,
         val frequency: HabitFrequency,
+        val inverse: Boolean,
     ) : HabitEditorResult
 
     /**
@@ -110,6 +112,8 @@ fun HabitEditorDialog(
      * to keep state consistent.
      */
     dailyOnly: Boolean = false,
+    /** When false, hide the inverse-habit toggle entirely. */
+    allowInverseHabits: Boolean = true,
 ) {
     val isEdit = existing != null
 
@@ -119,6 +123,7 @@ fun HabitEditorDialog(
     var colorKey by remember {
         mutableStateOf(existing?.colorKey ?: HabitColors.palette.random().key)
     }
+    var inverse by remember { mutableStateOf(existing?.inverse ?: false) }
 
     val initialFrequency = existing?.frequency ?: HabitFrequency.Daily
     var frequencyKind by remember {
@@ -161,6 +166,7 @@ fun HabitEditorDialog(
                 iconKey = iconKey,
                 colorKey = colorKey,
                 frequency = frequency,
+                inverse = if (allowInverseHabits) inverse else existing?.inverse ?: false,
             )
         )
     }
@@ -228,6 +234,20 @@ fun HabitEditorDialog(
                         minLines = 1,
                         maxLines = 3,
                     )
+                }
+
+                if (allowInverseHabits) {
+                    CaptionedSection(
+                        caption = "Behaviour",
+                        helpText = "Inverse habits are for breaking bad habits. " +
+                            "They start each day as done; tap only if the bad " +
+                            "habit happened, which marks that day as missed.",
+                    ) {
+                        InverseHabitToggle(
+                            checked = inverse,
+                            onCheckedChange = { inverse = it },
+                        )
+                    }
                 }
 
                 // --- Frequency card ---
@@ -516,6 +536,36 @@ private fun IconGrid(selectedKey: String, accent: Color, onSelected: (String) ->
  * label length, fixing the awkward "Daily is tiny, Custom is huge" look
  * the FlowRow chips had before.
  */
+@Composable
+private fun InverseHabitToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Inverse habit",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "For habits you want to avoid",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
 @Composable
 private fun FrequencyPicker(
     kind: FrequencyKind,

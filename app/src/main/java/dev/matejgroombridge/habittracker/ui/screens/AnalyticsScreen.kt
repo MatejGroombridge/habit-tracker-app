@@ -67,6 +67,8 @@ import java.time.LocalDate
 fun AnalyticsScreen(
     viewModel: HomeViewModel,
     contentPadding: PaddingValues = PaddingValues(),
+    /** When false, render stored inverse habits as normal habits without deleting their flag. */
+    allowInverseHabits: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
@@ -110,7 +112,7 @@ fun AnalyticsScreen(
         ) {
             items(items = state.activeHabits, key = { it.id }) { habit ->
                 AnalyticsRow(
-                    habit = habit,
+                    habit = if (allowInverseHabits) habit else habit.copy(inverse = false),
                     today = today,
                     endOfCurrentWeek = endOfCurrentWeek,
                 )
@@ -128,9 +130,12 @@ private fun AnalyticsRow(
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
 
-    val totalCompletions = remember(habit.completedDays) { habit.completedDays.size }
-    val streak = remember(habit.completedDays, today) { habit.currentStreak(today) }
-    val topStreak = remember(habit.completedDays) { habit.longestStreak() }
+    val totalCompletions = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay, today) {
+        if (habit.inverse) (habit.createdAtEpochDay..today).count { habit.isSuccessfulOn(it) }
+        else habit.completedDays.size
+    }
+    val streak = remember(habit.completedDays, habit.inverse, today) { habit.currentStreak(today) }
+    val topStreak = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay) { habit.longestStreak() }
 
     val contentColor = MaterialTheme.colorScheme.onBackground
     val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -167,7 +172,7 @@ private fun AnalyticsRow(
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "$totalCompletions completed",
+                        text = if (habit.inverse) "$totalCompletions successful" else "$totalCompletions completed",
                         style = MaterialTheme.typography.bodySmall,
                         color = mutedColor,
                     )
@@ -210,6 +215,7 @@ private fun AnalyticsRow(
             createdAtEpochDay = habit.createdAtEpochDay,
             completedDays = habit.completedDays,
             skippedDays = habit.skippedDays,
+            inverse = habit.inverse,
             pausedSinceEpochDay = habit.pausedSinceEpochDay,
             today = today,
             endOfCurrentWeek = endOfCurrentWeek,
@@ -229,6 +235,7 @@ private fun ContributionGrid(
     createdAtEpochDay: Long,
     completedDays: Set<Long>,
     skippedDays: Set<Long>,
+    inverse: Boolean,
     pausedSinceEpochDay: Long?,
     today: Long,
     endOfCurrentWeek: LocalDate,
@@ -296,7 +303,11 @@ private fun ContributionGrid(
                         val cellDate = weekMonday.plusDays(offset.toLong())
                         val cellEpoch = cellDate.toEpochDay()
                         val inFuture = cellEpoch > today
-                        val completed = cellEpoch in completedDays
+                        val completed = if (inverse) {
+                            cellEpoch >= createdAtEpochDay && cellEpoch !in completedDays
+                        } else {
+                            cellEpoch in completedDays
+                        }
                         val skipped = cellEpoch in skippedDays
                         val paused = pausedSinceEpochDay != null && cellEpoch >= pausedSinceEpochDay
                         GridCell(
