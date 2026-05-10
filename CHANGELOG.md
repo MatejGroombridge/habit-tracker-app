@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.2.0 — 2026-05-10
+
+Inverse habit support
+
+
 ## v2.1.0 — 2026-05-06
 
 Settings cleanup + Zen mode
