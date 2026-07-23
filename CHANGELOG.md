@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.2.1 — 2026-07-23
+
+Streak counter no longer resets to 0 until a day is actually missed
+
+
 ## v2.2.0 — 2026-05-10
 
 Inverse habit support
