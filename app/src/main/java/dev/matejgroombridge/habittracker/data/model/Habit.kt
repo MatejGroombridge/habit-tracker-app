@@ -100,7 +100,12 @@ data class Habit(
     /** Length of the longest streak of consecutive days ending on [today], or 0. */
     fun currentStreak(today: Long): Long {
         var streak = 0L
-        var day = today
+        // Today is still in progress: a normal habit not yet completed today
+        // hasn't broken its streak — the day isn't missed until it's over. So
+        // start counting from yesterday in that case. Inverse habits don't get
+        // this grace: they're successful today by default, so an unsuccessful
+        // today means the bad habit already occurred and the streak is broken.
+        var day = if (!inverse && !isSuccessfulOn(today)) today - 1 else today
         while (day >= createdAtEpochDay && isSuccessfulOn(day)) {
             streak++
             day--
