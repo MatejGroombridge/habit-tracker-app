@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.matejgroombridge.habittracker.data.model.Habit
+import dev.matejgroombridge.habittracker.data.model.HabitBackfill
 import dev.matejgroombridge.habittracker.data.model.HabitFrequency
 import dev.matejgroombridge.habittracker.data.repository.HabitRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +26,13 @@ data class HomeUiState(
     val activeHabits: List<Habit> = emptyList(),
     val archivedHabits: List<Habit> = emptyList(),
     val todayEpochDay: Long = LocalDate.now().toEpochDay(),
+    /**
+     * The day the user's oldest habit — archived ones included — was
+     * created, or `null` if they have none yet. The habit editor offers to
+     * backfill a habit's history back to this day so a late starter doesn't
+     * sit in the All Time grid as a mostly-empty row.
+     */
+    val oldestHabitEpochDay: Long? = null,
 )
 
 class HomeViewModel(
@@ -39,6 +47,7 @@ class HomeViewModel(
                 activeHabits = habits.filterNot { it.archived },
                 archivedHabits = habits.filter { it.archived },
                 todayEpochDay = today,
+                oldestHabitEpochDay = HabitBackfill.earliestCreation(habits),
             )
         }
         .stateIn(
@@ -54,6 +63,11 @@ class HomeViewModel(
         colorKey: String,
         frequency: HabitFrequency,
         inverse: Boolean,
+        /**
+         * When non-null, backdate the habit to [HomeUiState.oldestHabitEpochDay]
+         * and fill in synthetic history at roughly this success rate.
+         */
+        backfillPercent: Int? = null,
     ) {
         viewModelScope.launch {
             repository.addHabit(
@@ -64,6 +78,7 @@ class HomeViewModel(
                 colorKey = colorKey,
                 frequency = frequency,
                 inverse = inverse,
+                backfillPercent = backfillPercent,
             )
         }
     }
@@ -77,12 +92,21 @@ class HomeViewModel(
         frequency: HabitFrequency,
         skipsPerWeek: Int = -1,
         inverse: Boolean? = null,
+        /**
+         * When non-null, also extend the habit's history back to the day the
+         * user's oldest habit started, at roughly this success rate. Additive
+         * — the days the habit already has recorded are left alone.
+         */
+        backfillPercent: Int? = null,
     ) {
         viewModelScope.launch {
             repository.updateHabit(
                 habitId, name, description, iconKey, colorKey, frequency, skipsPerWeek,
                 inverse = inverse,
             )
+            // Sequenced inside the same coroutine so the generated days
+            // honour the frequency that was just saved.
+            if (backfillPercent != null) repository.backfillHistory(habitId, backfillPercent)
         }
     }
 

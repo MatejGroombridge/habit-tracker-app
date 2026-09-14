@@ -151,6 +151,8 @@ fun HomeScreen(
             onDismiss = { dialog = null },
             dailyOnly = settings.dailyHabitsOnly,
             allowInverseHabits = settings.allowInverseHabits,
+            backfillStartEpochDay = state.oldestHabitEpochDay,
+            todayEpochDay = state.todayEpochDay,
             onResult = { result ->
                 if (result is HabitEditorResult.Save) {
                     viewModel.addHabit(
@@ -160,6 +162,7 @@ fun HomeScreen(
                         colorKey = result.colorKey,
                         frequency = result.frequency,
                         inverse = result.inverse,
+                        backfillPercent = result.backfillPercent,
                     )
                 }
                 dialog = null
@@ -198,6 +201,8 @@ fun HomeScreen(
             onDismiss = { dialog = null },
             dailyOnly = settings.dailyHabitsOnly,
             allowInverseHabits = settings.allowInverseHabits,
+            backfillStartEpochDay = state.oldestHabitEpochDay,
+            todayEpochDay = state.todayEpochDay,
             onWriteNfc = {
                 dialog = null
                 onOpenWriteNfc()
@@ -212,6 +217,7 @@ fun HomeScreen(
                         colorKey = result.colorKey,
                         frequency = result.frequency,
                         inverse = result.inverse,
+                        backfillPercent = result.backfillPercent,
                     )
                     is HabitEditorResult.Archive -> viewModel.setArchived(d.habit.id, result.archived)
                 }
