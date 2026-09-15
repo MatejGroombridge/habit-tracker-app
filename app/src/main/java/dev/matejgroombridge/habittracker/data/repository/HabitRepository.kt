@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.matejgroombridge.habittracker.data.model.Habit
+import dev.matejgroombridge.habittracker.data.model.HabitBackfill
 import dev.matejgroombridge.habittracker.data.model.HabitFrequency
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -43,6 +44,14 @@ class HabitRepository(private val context: Context) {
     /**
      * Creates a new habit. All optional fields default to sensible values
      * matching [Habit]'s defaults.
+     *
+     * When [backfillPercent] is non-null the habit is backdated to the day
+     * the user's oldest existing habit was created and given synthetic
+     * history at roughly that success rate, so it doesn't sit in the All
+     * Time grid as an empty row next to habits that go back months. The
+     * start day is resolved here rather than passed in so it always reflects
+     * the list as stored. With no existing habits there's nothing to line up
+     * with, so the flag is ignored and the habit starts today as usual.
      */
     suspend fun addHabit(
         name: String,
@@ -52,19 +61,61 @@ class HabitRepository(private val context: Context) {
         colorKey: String = Habit.DEFAULT_COLOR_KEY,
         frequency: HabitFrequency = HabitFrequency.Daily,
         inverse: Boolean = false,
+        backfillPercent: Int? = null,
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         update { current ->
+            val backfillStart = backfillPercent
+                ?.let { HabitBackfill.earliestCreation(current) }
+                ?.coerceAtMost(todayEpochDay)
+            val backfilled = if (backfillPercent == null || backfillStart == null) emptySet()
+            else HabitBackfill.generate(
+                startEpochDay = backfillStart,
+                endExclusiveEpochDay = todayEpochDay,
+                percent = backfillPercent,
+                frequency = frequency,
+                inverse = inverse,
+            )
             current + Habit(
                 name = trimmed,
                 description = description.trim(),
                 iconKey = iconKey,
                 colorKey = colorKey,
                 frequency = frequency,
-                createdAtEpochDay = todayEpochDay,
+                createdAtEpochDay = backfillStart ?: todayEpochDay,
                 inverse = inverse,
+                completedDays = backfilled,
             )
+        }
+    }
+
+    /**
+     * Extends [habitId]'s history backwards to the day the user's oldest
+     * habit was created, filling the days that opens up at roughly [percent]
+     * success.
+     *
+     * Purely additive: the habit's own recorded days are never touched, only
+     * the stretch of time in front of its old creation date is filled in.
+     * No-op when the habit is already the oldest one (nothing to reach back
+     * to) or when it can't be found.
+     */
+    suspend fun backfillHistory(habitId: String, percent: Int) {
+        update { current ->
+            val start = HabitBackfill.earliestCreation(current) ?: return@update current
+            current.map { h ->
+                if (h.id != habitId || start >= h.createdAtEpochDay) h
+                else h.copy(
+                    createdAtEpochDay = start,
+                    completedDays = h.completedDays + HabitBackfill.generate(
+                        startEpochDay = start,
+                        endExclusiveEpochDay = h.createdAtEpochDay,
+                        percent = percent,
+                        frequency = h.frequency,
+                        inverse = h.inverse,
+                    ),
+                )
+            }
         }
     }
 

@@ -60,9 +60,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.matejgroombridge.habittracker.data.model.Habit
+import dev.matejgroombridge.habittracker.data.model.HabitBackfill
 import dev.matejgroombridge.habittracker.data.model.HabitFrequency
 import dev.matejgroombridge.habittracker.ui.theme.HabitColors
 import dev.matejgroombridge.habittracker.ui.theme.HabitIcons
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 /** Result emitted by [HabitEditorDialog] when the user takes an action. */
 sealed interface HabitEditorResult {
@@ -73,6 +76,14 @@ sealed interface HabitEditorResult {
         val colorKey: String,
         val frequency: HabitFrequency,
         val inverse: Boolean,
+        /**
+         * When non-null the habit's history should be extended back to the
+         * day the user's oldest habit was created, filled at roughly this
+         * success rate. `null` = leave history alone. In edit mode this only
+         * ever adds the stretch before the habit's own start date; days it
+         * already has recorded are never rewritten.
+         */
+        val backfillPercent: Int? = null,
     ) : HabitEditorResult
 
     /**
@@ -114,6 +125,14 @@ fun HabitEditorDialog(
     dailyOnly: Boolean = false,
     /** When false, hide the inverse-habit toggle entirely. */
     allowInverseHabits: Boolean = true,
+    /**
+     * Day the user's oldest habit was created. When there's a gap between
+     * it and where this habit's history starts, the History card offers to
+     * fill that gap in. Pass null to hide the card — which is what a
+     * first-ever habit, and the oldest habit itself, both want.
+     */
+    backfillStartEpochDay: Long? = null,
+    todayEpochDay: Long = LocalDate.now().toEpochDay(),
 ) {
     val isEdit = existing != null
 
@@ -149,6 +168,16 @@ fun HabitEditorDialog(
 
     var showIconPicker by remember { mutableStateOf(false) }
 
+    // The window a backfill would fill: from the oldest habit's start up to
+    // the day this habit's own history begins — today for a new habit, its
+    // creation day when editing. An empty window means there's nothing to
+    // add and the card stays hidden.
+    val backfillEndEpochDay = existing?.createdAtEpochDay ?: todayEpochDay
+    val canBackfill = backfillStartEpochDay != null &&
+        backfillStartEpochDay < backfillEndEpochDay
+    var backfillEnabled by remember { mutableStateOf(false) }
+    var backfillPercent by remember { mutableIntStateOf(HabitBackfill.DEFAULT_PERCENT) }
+
     val canSave = name.trim().isNotEmpty()
 
     fun submit() {
@@ -167,6 +196,7 @@ fun HabitEditorDialog(
                 colorKey = colorKey,
                 frequency = frequency,
                 inverse = if (allowInverseHabits) inverse else existing?.inverse ?: false,
+                backfillPercent = if (canBackfill && backfillEnabled) backfillPercent else null,
             )
         )
     }
@@ -261,6 +291,30 @@ fun HabitEditorDialog(
                         onTimesPerWeekChange = { timesPerWeek = it.coerceIn(1, 7) },
                         dailyOnly = dailyOnly,
                     )
+                }
+
+                // --- History card. Sits after Frequency because the
+                // backfill honours it: a weekly habit gets one candidate
+                // day per week, not seven. -----------------------------
+                if (canBackfill && backfillStartEpochDay != null) {
+                    CaptionedSection(
+                        caption = "History",
+                        helpText = "A habit started later than the rest shows an empty " +
+                            "stretch in the All Time grid. Backfilling dates it back to " +
+                            "the day your oldest habit started and fills those days with " +
+                            "a random spread matching the rate you set. Days this habit " +
+                            "already has recorded are never changed.",
+                    ) {
+                        HistoryBackfillPicker(
+                            enabled = backfillEnabled,
+                            onEnabledChange = { backfillEnabled = it },
+                            percent = backfillPercent,
+                            onPercentChange = { backfillPercent = it },
+                            startEpochDay = backfillStartEpochDay,
+                            endEpochDay = backfillEndEpochDay,
+                            inverse = allowInverseHabits && inverse,
+                        )
+                    }
                 }
 
                 // --- NFC actions card (edit mode only). Replaces the URL
@@ -566,6 +620,73 @@ private fun InverseHabitToggle(
     }
 }
 
+/**
+ * Switch row + percentage stepper for backfilling a habit's history.
+ *
+ * The subtitle spells out exactly what "backfill" will do — the date it
+ * reaches back to and how many days that is — because the action writes a
+ * few hundred completions in one tap and shouldn't be a surprise.
+ */
+@Composable
+private fun HistoryBackfillPicker(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    percent: Int,
+    onPercentChange: (Int) -> Unit,
+    startEpochDay: Long,
+    endEpochDay: Long,
+    inverse: Boolean,
+) {
+    val startLabel = remember(startEpochDay) {
+        LocalDate.ofEpochDay(startEpochDay).format(BACKFILL_DATE_FORMAT)
+    }
+    val days = (endEpochDay - startEpochDay).coerceAtLeast(0L)
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .clickable { onEnabledChange(!enabled) }
+                .padding(horizontal = 2.dp, vertical = 2.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Backfill history",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = "Back to $startLabel · $days ${if (days == 1L) "day" else "days"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+        if (enabled) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CompactStepper(
+                    value = percent,
+                    onChange = onPercentChange,
+                    label = { v -> if (inverse) "$v% clean" else "$v% completed" },
+                    min = HabitBackfill.MIN_PERCENT,
+                    max = 100,
+                    step = HabitBackfill.PERCENT_STEP,
+                )
+            }
+        }
+    }
+}
+
+private val BACKFILL_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+
 @Composable
 private fun FrequencyPicker(
     kind: FrequencyKind,
@@ -710,6 +831,9 @@ private fun CompactStepper(
     value: Int,
     onChange: (Int) -> Unit,
     label: (Int) -> String,
+    min: Int = 1,
+    max: Int = 30,
+    step: Int = 1,
 ) {
     val shape = RoundedCornerShape(24.dp)
     Row(
@@ -722,8 +846,8 @@ private fun CompactStepper(
         StepperButton(
             icon = Icons.Outlined.Remove,
             description = "Decrease",
-            enabled = value > 1,
-            onClick = { onChange(value - 1) },
+            enabled = value > min,
+            onClick = { onChange((value - step).coerceAtLeast(min)) },
         )
         Spacer(Modifier.width(4.dp))
         Text(
@@ -736,8 +860,8 @@ private fun CompactStepper(
         StepperButton(
             icon = Icons.Outlined.Add,
             description = "Increase",
-            enabled = value < 30,
-            onClick = { onChange(value + 1) },
+            enabled = value < max,
+            onClick = { onChange((value + step).coerceAtMost(max)) },
         )
     }
 }
