@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.3.0 — 2026-09-15
+
+Backfill history for habits you started tracking later than the rest
+
+
 ## v2.2.1 — 2026-07-23
 
 Streak counter no longer resets to 0 until a day is actually missed
