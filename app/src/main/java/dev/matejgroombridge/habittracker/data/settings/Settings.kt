@@ -15,6 +15,12 @@ data class Settings(
     val weekStart: WeekStart = WeekStart.Default,
     val reminders: ReminderSettings = ReminderSettings(),
     /**
+     * Notification on the 1st of each month summarising the month before:
+     * perfect days, consistency, best and most-improved habit. Independent
+     * of daily reminders; fires at the first reminder time.
+     */
+    val monthlyRecap: Boolean = true,
+    /**
      * When `true` the user can swipe horizontally between Today / Past Week
      * / All Time. When `false` the pager only responds to bottom-bar taps,
      * which is useful for users who find swipe gestures conflict with
@@ -36,13 +42,6 @@ data class Settings(
      * storage; toggling back on restores it untouched.
      */
     val allowPauses: Boolean = true,
-    /**
-     * Master switch for inverse habits (bad-habit breaking). When `false`,
-     * the per-habit "Inverse habit" toggle is hidden from create/edit and
-     * existing inverse habits behave like normal habits in the UI without
-     * losing their stored inverse flag.
-     */
-    val allowInverseHabits: Boolean = true,
     /**
      * When `true` the app treats only Daily-frequency habits as visible.
      * Any habit whose frequency is Weekly / TimesPerWeek / EveryNDays is

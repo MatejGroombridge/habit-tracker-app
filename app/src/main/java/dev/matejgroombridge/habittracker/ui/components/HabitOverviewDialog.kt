@@ -79,14 +79,10 @@ fun HabitOverviewDialog(
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
 
-    val currentStreak = remember(habit.completedDays, todayEpochDay) {
-        habit.currentStreak(todayEpochDay)
-    }
-    val topStreak = remember(habit.completedDays) { habit.longestStreak() }
-    val totalCompletions = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay, todayEpochDay) {
-        if (habit.inverse) (habit.createdAtEpochDay..todayEpochDay).count { habit.isSuccessfulOn(it) }
-        else habit.completedDays.size
-    }
+    // Keyed on the whole habit: pauses and skips now shape streaks too.
+    val currentStreak = remember(habit, todayEpochDay) { habit.currentStreak(todayEpochDay) }
+    val topStreak = remember(habit, todayEpochDay) { habit.longestStreak(todayEpochDay) }
+    val totalCompletions = habit.completedDays.size
     val daysSinceCreated = (todayEpochDay - habit.createdAtEpochDay).coerceAtLeast(0L)
     val completionRate = remember(totalCompletions, daysSinceCreated) {
         // Use createdAtEpochDay as the denominator so a brand-new habit
@@ -199,7 +195,7 @@ fun HabitOverviewDialog(
                         modifier = Modifier.weight(1f),
                     )
                     StatTile(
-                        label = if (habit.inverse) "Success" else "Total",
+                        label = "Total",
                         value = totalCompletions.toString(),
                         icon = Icons.Outlined.TaskAlt,
                         accent = color.accent,
@@ -355,7 +351,7 @@ private fun LastSevenDaysStrip(
         for (offset in 6 downTo 0) {
             val day = todayEpochDay - offset
             val date = LocalDate.ofEpochDay(day)
-            val completed = habit.isSuccessfulOn(day)
+            val completed = habit.isCompletedOn(day)
             val isToday = offset == 0
             DayCell(
                 label = dayLabel(date.dayOfWeek),

@@ -11,6 +11,7 @@ import dev.matejgroombridge.habittracker.data.settings.NfcAction
 import dev.matejgroombridge.habittracker.data.settings.Settings
 import dev.matejgroombridge.habittracker.data.settings.SettingsRepository
 import dev.matejgroombridge.habittracker.data.settings.WeekStart
+import dev.matejgroombridge.habittracker.notifications.MonthlyRecapScheduler
 import dev.matejgroombridge.habittracker.notifications.ReminderScheduler
 import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
@@ -73,6 +74,13 @@ class SettingsViewModel(
         }
     }
 
+    fun setMonthlyRecap(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setMonthlyRecap(enabled)
+            MonthlyRecapScheduler.reschedule(appContext)
+        }
+    }
+
     fun setSwipeToNavigate(enabled: Boolean) {
         viewModelScope.launch { repository.setSwipeToNavigate(enabled) }
     }
@@ -83,10 +91,6 @@ class SettingsViewModel(
 
     fun setAllowPauses(enabled: Boolean) {
         viewModelScope.launch { repository.setAllowPauses(enabled) }
-    }
-
-    fun setAllowInverseHabits(enabled: Boolean) {
-        viewModelScope.launch { repository.setAllowInverseHabits(enabled) }
     }
 
     /**

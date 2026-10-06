@@ -51,10 +51,7 @@ object HabitBackfill {
      *
      * Which days are eligible depends on [frequency]: a weekly habit gets one
      * candidate day per ISO week rather than seven, so "100%" means "never
-     * missed a week" instead of "completed every single day". Inverse habits
-     * ignore frequency — every day is a day the bad habit could have happened
-     * — and the recorded days are the *failures*, matching how
-     * [Habit.isSuccessfulOn] reads the set for them.
+     * missed a week" instead of "completed every single day".
      *
      * [random] is injectable for tests; production calls take the default.
      */
@@ -63,21 +60,11 @@ object HabitBackfill {
         endExclusiveEpochDay: Long,
         percent: Int,
         frequency: HabitFrequency = HabitFrequency.Daily,
-        inverse: Boolean = false,
         random: Random = Random.Default,
     ): Set<Long> {
         val lastDay = endExclusiveEpochDay - 1
         if (startEpochDay > lastDay) return emptySet()
         val rate = percent.coerceIn(0, 100)
-
-        if (inverse) {
-            // Success is the absence of an occurrence, so we sample the
-            // complement: a 90% habit slipped on 10% of days.
-            val allDays = (startEpochDay..lastDay).toList()
-            val slips = allDays.size - proportionOf(allDays.size, rate)
-            return allDays.shuffled(random).take(slips).toSet()
-        }
-
         val candidates = candidateDays(startEpochDay, lastDay, frequency, random)
         return candidates.shuffled(random).take(proportionOf(candidates.size, rate)).toSet()
     }

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.matejgroombridge.habittracker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -35,10 +36,10 @@ class SettingsRepository(private val context: Context) {
             ),
             // New General toggles default to "previous behaviour" so existing
             // installs see no change at upgrade time.
+            monthlyRecap = prefs[KEY_MONTHLY_RECAP] ?: true,
             swipeToNavigate = prefs[KEY_SWIPE_TO_NAVIGATE] ?: true,
             allowSkips = prefs[KEY_ALLOW_SKIPS] ?: true,
             allowPauses = prefs[KEY_ALLOW_PAUSES] ?: true,
-            allowInverseHabits = prefs[KEY_ALLOW_INVERSE_HABITS] ?: true,
             dailyHabitsOnly = prefs[KEY_DAILY_HABITS_ONLY] ?: false,
             zenMode = prefs[KEY_ZEN_MODE] ?: false,
         )
@@ -46,6 +47,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setZenMode(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[KEY_ZEN_MODE] = enabled }
+    }
+
+    suspend fun setMonthlyRecap(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[KEY_MONTHLY_RECAP] = enabled }
     }
 
     suspend fun setSwipeToNavigate(enabled: Boolean) {
@@ -60,9 +65,14 @@ class SettingsRepository(private val context: Context) {
         context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_PAUSES] = enabled }
     }
 
-    suspend fun setAllowInverseHabits(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[KEY_ALLOW_INVERSE_HABITS] = enabled }
-    }
+    /**
+     * Whether the since-removed "Allow inverse habits" toggle was on. With it
+     * off, the app displayed inverse habits as ordinary ones, which decides
+     * how `HabitRepository` converts their history. Defaults to on, matching
+     * the toggle's old default.
+     */
+    suspend fun legacyInverseHabitsEnabled(): Boolean =
+        context.settingsDataStore.data.first()[KEY_LEGACY_ALLOW_INVERSE_HABITS] ?: true
 
     suspend fun setDailyHabitsOnly(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[KEY_DAILY_HABITS_ONLY] = enabled }
@@ -123,10 +133,11 @@ class SettingsRepository(private val context: Context) {
         val KEY_REMINDER_TIMES_PER_DAY = intPreferencesKey("reminder_times_per_day")
         val KEY_REMINDER_FIRST_TIME = stringPreferencesKey("reminder_first_time")
         val KEY_REMINDER_LAST_TIME = stringPreferencesKey("reminder_last_time")
+        val KEY_MONTHLY_RECAP = booleanPreferencesKey("monthly_recap")
         val KEY_SWIPE_TO_NAVIGATE = booleanPreferencesKey("swipe_to_navigate")
         val KEY_ALLOW_SKIPS = booleanPreferencesKey("allow_skips")
         val KEY_ALLOW_PAUSES = booleanPreferencesKey("allow_pauses")
-        val KEY_ALLOW_INVERSE_HABITS = booleanPreferencesKey("allow_inverse_habits")
+        val KEY_LEGACY_ALLOW_INVERSE_HABITS = booleanPreferencesKey("allow_inverse_habits")
         val KEY_DAILY_HABITS_ONLY = booleanPreferencesKey("daily_habits_only")
         val KEY_ZEN_MODE = booleanPreferencesKey("zen_mode")
     }

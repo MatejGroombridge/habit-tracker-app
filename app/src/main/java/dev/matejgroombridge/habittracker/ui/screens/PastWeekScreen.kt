@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
+import dev.matejgroombridge.habittracker.ui.components.PausedCell
 import dev.matejgroombridge.habittracker.ui.theme.HabitColors
 import dev.matejgroombridge.habittracker.ui.theme.HabitIcons
 import dev.matejgroombridge.habittracker.ui.theme.containerColor
@@ -70,8 +71,6 @@ fun PastWeekScreen(
     allowSkips: Boolean = true,
     /** Hide the Pause option in the long-press menu when global allowPauses is off. */
     allowPauses: Boolean = true,
-    /** When false, render stored inverse habits as normal habits without deleting their flag. */
-    allowInverseHabits: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
@@ -110,9 +109,8 @@ fun PastWeekScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items = state.activeHabits, key = { it.id }) { habit ->
-                val displayHabit = if (allowInverseHabits) habit else habit.copy(inverse = false)
                 PastWeekRow(
-                    habit = displayHabit,
+                    habit = habit,
                     days = days,
                     today = today,
                     allowSkips = allowSkips,
@@ -121,22 +119,14 @@ fun PastWeekScreen(
                         // Tap = toggle completion (existing behaviour). If
                         // the day is currently skipped or paused, clear
                         // those first so the toggle has a sensible target.
-                        if (displayHabit.isSkippedOn(day)) {
-                            viewModel.setSkipped(displayHabit.id, day, false)
+                        if (habit.isSkippedOn(day)) {
+                            viewModel.setSkipped(habit.id, day, false)
                         } else {
-                            // For inverse habits, completedDays means "the bad
-                            // habit happened". Tapping a successful/default day
-                            // records an occurrence; tapping that occurrence
-                            // clears it back to success.
-                            viewModel.setCompleted(
-                                displayHabit.id,
-                                day,
-                                !displayHabit.isCompletedOn(day),
-                            )
+                            viewModel.setCompleted(habit.id, day, !habit.isCompletedOn(day))
                         }
                     },
                     onPickStateForDay = { day, state ->
-                        viewModel.applyDayState(displayHabit, day, state)
+                        viewModel.applyDayState(habit, day, state)
                     },
                 )
             }
@@ -230,9 +220,9 @@ private fun PastWeekRow(
                 days.forEach { epochDay ->
                     DayChip(
                         date = LocalDate.ofEpochDay(epochDay),
-                        completed = habit.isSuccessfulOn(epochDay),
+                        completed = habit.isCompletedOn(epochDay),
                         skipped = habit.isSkippedOn(epochDay),
-                        paused = habit.pausedSinceEpochDay != null && epochDay >= habit.pausedSinceEpochDay,
+                        paused = habit.isPausedOn(epochDay),
                         isPaused = habit.isPaused,
                         isToday = epochDay == today,
                         accent = color.accent,
@@ -332,7 +322,7 @@ private fun DayChip(
 
 /**
  * Visual representation of a single day. Mirrors the All Time grid:
- *  * **Paused** → full-cell pause icon on a tinted background.
+ *  * **Paused** → the cell itself is the pause "‖" — see [PausedCell].
  *  * **Skipped** → filled circle in the muted accent.
  *  * **Completed** → filled rounded square + check mark.
  *  * **Otherwise** → faded square with day-of-month number.
@@ -348,19 +338,11 @@ private fun DayCellShape(
     modifier: Modifier = Modifier,
 ) {
     when {
-        paused -> Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(accent.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Pause,
-                contentDescription = "Paused",
-                tint = accent,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        paused -> PausedCell(
+            color = accent,
+            shape = RoundedCornerShape(10.dp),
+            modifier = modifier,
+        )
         skipped -> Box(
             modifier = modifier
                 .clip(CircleShape)

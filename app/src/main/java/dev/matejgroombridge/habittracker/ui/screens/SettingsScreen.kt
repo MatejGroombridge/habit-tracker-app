@@ -302,6 +302,27 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    Divider()
+                    val recapPermission = if (android.os.Build.VERSION.SDK_INT >=
+                        android.os.Build.VERSION_CODES.TIRAMISU
+                    ) {
+                        androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                        ) { granted -> if (!granted) viewModel.setMonthlyRecap(false) }
+                    } else null
+                    SwitchRow(
+                        icon = Icons.Outlined.NotificationsActive,
+                        label = "Monthly recap",
+                        subtitle = "Last month's stats on the 1st",
+                        checked = settings.monthlyRecap,
+                        onChange = { wantsOn ->
+                            haptics.light()
+                            viewModel.setMonthlyRecap(wantsOn)
+                            if (wantsOn && recapPermission != null) {
+                                recapPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                    )
                 }
             }
 
@@ -352,15 +373,6 @@ fun SettingsScreen(
                         onCheckedChange = {
                             haptics.light()
                             viewModel.setAllowPauses(it)
-                        },
-                    )
-                    Divider()
-                    CompactSwitchRow(
-                        label = "Allow inverse habits",
-                        checked = settings.allowInverseHabits,
-                        onCheckedChange = {
-                            haptics.light()
-                            viewModel.setAllowInverseHabits(it)
                         },
                     )
                     Divider()

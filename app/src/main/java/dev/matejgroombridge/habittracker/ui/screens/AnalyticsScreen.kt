@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.ui.HomeViewModel
+import dev.matejgroombridge.habittracker.ui.components.PausedCell
 import dev.matejgroombridge.habittracker.ui.theme.HabitColors
 import dev.matejgroombridge.habittracker.ui.theme.HabitIcons
 import java.time.DayOfWeek
@@ -67,8 +68,6 @@ import java.time.LocalDate
 fun AnalyticsScreen(
     viewModel: HomeViewModel,
     contentPadding: PaddingValues = PaddingValues(),
-    /** When false, render stored inverse habits as normal habits without deleting their flag. */
-    allowInverseHabits: Boolean = true,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.todayEpochDay
@@ -112,7 +111,7 @@ fun AnalyticsScreen(
         ) {
             items(items = state.activeHabits, key = { it.id }) { habit ->
                 AnalyticsRow(
-                    habit = if (allowInverseHabits) habit else habit.copy(inverse = false),
+                    habit = habit,
                     today = today,
                     endOfCurrentWeek = endOfCurrentWeek,
                 )
@@ -130,12 +129,10 @@ private fun AnalyticsRow(
     val color = HabitColors.entry(habit.colorKey)
     val iconEntry = HabitIcons.entry(habit.iconKey)
 
-    val totalCompletions = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay, today) {
-        if (habit.inverse) (habit.createdAtEpochDay..today).count { habit.isSuccessfulOn(it) }
-        else habit.completedDays.size
-    }
-    val streak = remember(habit.completedDays, habit.inverse, today) { habit.currentStreak(today) }
-    val topStreak = remember(habit.completedDays, habit.inverse, habit.createdAtEpochDay) { habit.longestStreak() }
+    val totalCompletions = habit.completedDays.size
+    // Keyed on the whole habit: pauses and skips now shape streaks too.
+    val streak = remember(habit, today) { habit.currentStreak(today) }
+    val topStreak = remember(habit, today) { habit.longestStreak(today) }
 
     val contentColor = MaterialTheme.colorScheme.onBackground
     val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -172,7 +169,7 @@ private fun AnalyticsRow(
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (habit.inverse) "$totalCompletions successful" else "$totalCompletions completed",
+                        text = "$totalCompletions completed",
                         style = MaterialTheme.typography.bodySmall,
                         color = mutedColor,
                     )
@@ -212,11 +209,7 @@ private fun AnalyticsRow(
         }
         Spacer(Modifier.height(12.dp))
         ContributionGrid(
-            createdAtEpochDay = habit.createdAtEpochDay,
-            completedDays = habit.completedDays,
-            skippedDays = habit.skippedDays,
-            inverse = habit.inverse,
-            pausedSinceEpochDay = habit.pausedSinceEpochDay,
+            habit = habit,
             today = today,
             endOfCurrentWeek = endOfCurrentWeek,
             accent = color.accent,
@@ -232,11 +225,7 @@ private val GRID_RIGHT_PADDING = 12.dp
 
 @Composable
 private fun ContributionGrid(
-    createdAtEpochDay: Long,
-    completedDays: Set<Long>,
-    skippedDays: Set<Long>,
-    inverse: Boolean,
-    pausedSinceEpochDay: Long?,
+    habit: Habit,
     today: Long,
     endOfCurrentWeek: LocalDate,
     accent: Color,
@@ -256,8 +245,8 @@ private fun ContributionGrid(
 
         // Total weeks rendered = at least enough to fill the screen, but
         // grow over time so the user can scroll back through history.
-        val weeksAvailable = remember(createdAtEpochDay, endOfCurrentWeek, columnsThatFit) {
-            val createdDate = LocalDate.ofEpochDay(createdAtEpochDay)
+        val weeksAvailable = remember(habit.createdAtEpochDay, endOfCurrentWeek, columnsThatFit) {
+            val createdDate = LocalDate.ofEpochDay(habit.createdAtEpochDay)
             val daysBetween = java.time.temporal.ChronoUnit.DAYS
                 .between(createdDate, endOfCurrentWeek).toInt()
             val historyWeeks = (daysBetween + 6) / 7 + 1
@@ -303,13 +292,9 @@ private fun ContributionGrid(
                         val cellDate = weekMonday.plusDays(offset.toLong())
                         val cellEpoch = cellDate.toEpochDay()
                         val inFuture = cellEpoch > today
-                        val completed = if (inverse) {
-                            cellEpoch >= createdAtEpochDay && cellEpoch !in completedDays
-                        } else {
-                            cellEpoch in completedDays
-                        }
-                        val skipped = cellEpoch in skippedDays
-                        val paused = pausedSinceEpochDay != null && cellEpoch >= pausedSinceEpochDay
+                        val completed = habit.isCompletedOn(cellEpoch)
+                        val skipped = habit.isSkippedOn(cellEpoch)
+                        val paused = habit.isPausedOn(cellEpoch)
                         GridCell(
                             completed = completed,
                             skipped = skipped,
@@ -330,9 +315,7 @@ private fun ContributionGrid(
  *  - **Completed**: filled square in the habit's accent.
  *  - **Skipped**: filled circle in a muted accent — clearly distinct from a
  *    full completion (different shape) but visible at a glance.
- *  - **Paused** (any day on or after the pause date): pause "‖" symbol that
- *    fills the whole cell (rounded square background tinted with the muted
- *    accent so a paused stretch reads as a single visual block).
+ *  - **Paused**: the cell itself is the pause "‖" — see [PausedCell].
  *  - **Future**: faded empty so the grid shape is preserved.
  *  - **Otherwise**: empty filled square.
  */
@@ -348,22 +331,12 @@ private fun GridCell(
     when {
         // Pause overrides skip & complete: the user explicitly froze tracking
         // for these days, so render a pause glyph rather than an apparent
-        // achievement. Background takes the full cell and the icon scales
-        // up to occupy ~80% of it so the pause state reads instantly.
-        paused -> Box(
-            modifier = Modifier
-                .size(CELL_SIZE)
-                .clip(RoundedCornerShape(3.dp))
-                .background(accent.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Pause,
-                contentDescription = "Paused",
-                tint = accent,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        // achievement.
+        paused -> PausedCell(
+            color = accent,
+            shape = RoundedCornerShape(3.dp),
+            modifier = Modifier.size(CELL_SIZE),
+        )
         // Filled accent circle for skipped days. Slightly muted so the user
         // can still tell it apart from a completion at a glance.
         skipped -> Box(

@@ -117,6 +117,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Posts the monthly recap on the 1st and re-arms for next month.
+             Boot restoration goes through ReminderReceiver above. -->
+        <receiver
+            android:name=".notifications.MonthlyRecapReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

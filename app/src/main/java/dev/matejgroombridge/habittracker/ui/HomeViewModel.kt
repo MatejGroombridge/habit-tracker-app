@@ -10,8 +10,12 @@ import dev.matejgroombridge.habittracker.data.model.Habit
 import dev.matejgroombridge.habittracker.data.model.HabitBackfill
 import dev.matejgroombridge.habittracker.data.model.HabitFrequency
 import dev.matejgroombridge.habittracker.data.repository.HabitRepository
+import dev.matejgroombridge.habittracker.data.stats.HabitStats
+import dev.matejgroombridge.habittracker.data.stats.StatsSnapshot
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -56,13 +60,25 @@ class HomeViewModel(
             initialValue = HomeUiState(todayEpochDay = today),
         )
 
+    /**
+     * Stats tab data, plus the Today screen's "Perfect day #N". Recomputed
+     * on every change off the main thread — it walks every day of history.
+     */
+    val stats: StateFlow<StatsSnapshot> = repository.habits
+        .map { habits -> HabitStats.compute(habits, today) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = StatsSnapshot.empty(today),
+        )
+
     fun addHabit(
         name: String,
         description: String,
         iconKey: String,
         colorKey: String,
         frequency: HabitFrequency,
-        inverse: Boolean,
         /**
          * When non-null, backdate the habit to [HomeUiState.oldestHabitEpochDay]
          * and fill in synthetic history at roughly this success rate.
@@ -77,7 +93,6 @@ class HomeViewModel(
                 iconKey = iconKey,
                 colorKey = colorKey,
                 frequency = frequency,
-                inverse = inverse,
                 backfillPercent = backfillPercent,
             )
         }
@@ -91,7 +106,6 @@ class HomeViewModel(
         colorKey: String,
         frequency: HabitFrequency,
         skipsPerWeek: Int = -1,
-        inverse: Boolean? = null,
         /**
          * When non-null, also extend the habit's history back to the day the
          * user's oldest habit started, at roughly this success rate. Additive
@@ -102,7 +116,6 @@ class HomeViewModel(
         viewModelScope.launch {
             repository.updateHabit(
                 habitId, name, description, iconKey, colorKey, frequency, skipsPerWeek,
-                inverse = inverse,
             )
             // Sequenced inside the same coroutine so the generated days
             // honour the frequency that was just saved.
@@ -149,12 +162,12 @@ class HomeViewModel(
         viewModelScope.launch {
             uiState.value.activeHabits
                 .filter { it.frequency !is dev.matejgroombridge.habittracker.data.model.HabitFrequency.Daily }
-                .forEach { repository.setArchived(it.id, true) }
+                .forEach { repository.setArchived(it.id, true, today) }
         }
     }
 
     fun setArchived(habitId: String, archived: Boolean) {
-        viewModelScope.launch { repository.setArchived(habitId, archived) }
+        viewModelScope.launch { repository.setArchived(habitId, archived, today) }
     }
 
     fun deleteHabit(habitId: String) {

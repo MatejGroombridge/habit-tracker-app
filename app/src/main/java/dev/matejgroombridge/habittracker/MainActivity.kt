@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarViewWeek
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,8 @@ import dev.matejgroombridge.habittracker.ui.util.rememberHaptics
 import dev.matejgroombridge.habittracker.ui.screens.AnalyticsScreen
 import dev.matejgroombridge.habittracker.ui.screens.ArchivedHabitsScreen
 import dev.matejgroombridge.habittracker.ui.screens.HabitRemindersScreen
+import dev.matejgroombridge.habittracker.ui.screens.HabitStatsScreen
+import dev.matejgroombridge.habittracker.ui.screens.StatsScreen
 import dev.matejgroombridge.habittracker.ui.screens.HomeScreen
 import dev.matejgroombridge.habittracker.ui.screens.PastWeekScreen
 import dev.matejgroombridge.habittracker.ui.screens.ReorderHabitsScreen
@@ -56,13 +59,15 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private object Routes {
-    /** Single host route for the swipeable Today / Past Week / All Time pager. */
+    /** Single host route for the swipeable Past Week / Today / All Time / Stats pager. */
     const val MAIN = "main"
     const val SETTINGS = "settings"
     const val ARCHIVE = "archive"
     const val REORDER = "reorder"
     const val WRITE_NFC = "write_nfc"
     const val HABIT_REMINDERS = "habit_reminders"
+    const val HABIT_STATS = "habit_stats/{habitId}"
+    fun habitStats(habitId: String) = "habit_stats/$habitId"
 }
 
 private data class BottomTab(
@@ -70,22 +75,33 @@ private data class BottomTab(
     val icon: ImageVector,
 )
 
-// Order is intentional: pager index 0 → Past Week, 1 → Today, 2 → All Time.
-// Today sits in the middle so the user can swipe to it from either side; it's
-// also the page the app launches on (see [TODAY_PAGE_INDEX] / initialPage).
+// Order is intentional: pager index 0 → Past Week, 1 → Today, 2 → All Time,
+// 3 → Stats. Today sits second so the user can swipe to it from either side;
+// it's also the page the app launches on (see [TODAY_PAGE_INDEX] / initialPage).
 // Adjust both this list AND the `when (page)` switch in MainPager() to add a tab.
 private const val TODAY_PAGE_INDEX = 1
+private const val STATS_PAGE_INDEX = 3
 private val BOTTOM_TABS = listOf(
     BottomTab("Past Week", Icons.Outlined.CalendarViewWeek),
     BottomTab("Today", Icons.Outlined.CheckCircle),
     BottomTab("All Time", Icons.Outlined.BarChart),
+    BottomTab("Stats", Icons.Outlined.Insights),
 )
 
+/** Intent extra naming a tab to open on, e.g. from the monthly recap notification. */
+const val EXTRA_OPEN_TAB = "open_tab"
+const val TAB_STATS = "stats"
+
 class MainActivity : ComponentActivity() {
+
+    /** Set when an intent asks for the Stats tab; the pager clears it once shown. */
+    private val openStatsRequested = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        readTabRequest(intent)
         // If we were launched from an NFC "open" deep link, complete the
         // referenced habit before any UI shows. NfcCompletionActivity already
         // does this for the background/overlay paths; we mirror the same
@@ -116,7 +132,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    AppShell(settingsViewModel = settingsViewModel)
+                    AppShell(
+                        settingsViewModel = settingsViewModel,
+                        openStatsRequested = openStatsRequested.value,
+                        onOpenStatsHandled = { openStatsRequested.value = false },
+                    )
                 }
             }
         }
@@ -126,6 +146,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         completeHabitFromIntent(intent)
+        readTabRequest(intent)
+    }
+
+    private fun readTabRequest(intent: Intent?) {
+        if (intent?.getStringExtra(EXTRA_OPEN_TAB) == TAB_STATS) openStatsRequested.value = true
     }
 
     /**
@@ -154,13 +179,23 @@ private fun rememberApplication(): Application {
 }
 
 @Composable
-private fun AppShell(settingsViewModel: SettingsViewModel) {
+private fun AppShell(
+    settingsViewModel: SettingsViewModel,
+    openStatsRequested: Boolean,
+    onOpenStatsHandled: () -> Unit,
+) {
     val navController = rememberNavController()
     val app = rememberApplication()
 
     val homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.factory(app),
     )
+
+    // A request for the Stats tab (e.g. tapping the monthly recap) should
+    // land there even if the app was left on a pushed screen like Settings.
+    LaunchedEffect(openStatsRequested) {
+        if (openStatsRequested) navController.popBackStack(Routes.MAIN, inclusive = false)
+    }
 
     NavHost(
         navController = navController,
@@ -174,6 +209,16 @@ private fun AppShell(settingsViewModel: SettingsViewModel) {
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenArchive = { navController.navigate(Routes.ARCHIVE) },
                 onOpenWriteNfc = { navController.navigate(Routes.WRITE_NFC) },
+                onOpenHabitStats = { id -> navController.navigate(Routes.habitStats(id)) },
+                openStatsRequested = openStatsRequested,
+                onOpenStatsHandled = onOpenStatsHandled,
+            )
+        }
+        composable(Routes.HABIT_STATS) { entry ->
+            HabitStatsScreen(
+                viewModel = homeViewModel,
+                habitId = entry.arguments?.getString("habitId").orEmpty(),
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.SETTINGS) {
@@ -215,7 +260,7 @@ private fun AppShell(settingsViewModel: SettingsViewModel) {
 }
 
 /**
- * Hosts the three top-level screens (Today, Past Week, All Time) inside a
+ * Hosts the four top-level screens (Past Week, Today, All Time, Stats) inside a
  * [HorizontalPager], so the user can swipe between them. The bottom
  * NavigationBar mirrors the pager's selected index — tapping a tab animates
  * the pager, swiping the pager updates the highlighted tab.
@@ -231,6 +276,9 @@ private fun MainPager(
     onOpenSettings: () -> Unit,
     onOpenArchive: () -> Unit,
     onOpenWriteNfc: () -> Unit,
+    onOpenHabitStats: (String) -> Unit,
+    openStatsRequested: Boolean,
+    onOpenStatsHandled: () -> Unit,
 ) {
     val pagerState = rememberPagerState(
         initialPage = TODAY_PAGE_INDEX,
@@ -261,6 +309,13 @@ private fun MainPager(
         if (settings.zenMode && pagerState.currentPage != TODAY_PAGE_INDEX) {
             pagerState.scrollToPage(TODAY_PAGE_INDEX)
         }
+    }
+
+    // Zen mode keeps the user on Today, so a Stats request is just dropped.
+    LaunchedEffect(openStatsRequested) {
+        if (!openStatsRequested) return@LaunchedEffect
+        if (!settings.zenMode) pagerState.scrollToPage(STATS_PAGE_INDEX)
+        onOpenStatsHandled()
     }
 
     Scaffold(
@@ -327,7 +382,6 @@ private fun MainPager(
                     contentPadding = padding,
                     allowSkips = settings.allowSkips,
                     allowPauses = settings.allowPauses,
-                    allowInverseHabits = settings.allowInverseHabits,
                 )
                 TODAY_PAGE_INDEX -> HomeScreen(
                     viewModel = homeViewModel,
@@ -342,7 +396,11 @@ private fun MainPager(
                 2 -> AnalyticsScreen(
                     viewModel = homeViewModel,
                     contentPadding = padding,
-                    allowInverseHabits = settings.allowInverseHabits,
+                )
+                STATS_PAGE_INDEX -> StatsScreen(
+                    viewModel = homeViewModel,
+                    contentPadding = padding,
+                    onOpenHabit = onOpenHabitStats,
                 )
             }
         }

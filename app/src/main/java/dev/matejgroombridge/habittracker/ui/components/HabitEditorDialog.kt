@@ -75,7 +75,6 @@ sealed interface HabitEditorResult {
         val iconKey: String,
         val colorKey: String,
         val frequency: HabitFrequency,
-        val inverse: Boolean,
         /**
          * When non-null the habit's history should be extended back to the
          * day the user's oldest habit was created, filled at roughly this
@@ -123,8 +122,6 @@ fun HabitEditorDialog(
      * to keep state consistent.
      */
     dailyOnly: Boolean = false,
-    /** When false, hide the inverse-habit toggle entirely. */
-    allowInverseHabits: Boolean = true,
     /**
      * Day the user's oldest habit was created. When there's a gap between
      * it and where this habit's history starts, the History card offers to
@@ -142,7 +139,6 @@ fun HabitEditorDialog(
     var colorKey by remember {
         mutableStateOf(existing?.colorKey ?: HabitColors.palette.random().key)
     }
-    var inverse by remember { mutableStateOf(existing?.inverse ?: false) }
 
     val initialFrequency = existing?.frequency ?: HabitFrequency.Daily
     var frequencyKind by remember {
@@ -195,7 +191,6 @@ fun HabitEditorDialog(
                 iconKey = iconKey,
                 colorKey = colorKey,
                 frequency = frequency,
-                inverse = if (allowInverseHabits) inverse else existing?.inverse ?: false,
                 backfillPercent = if (canBackfill && backfillEnabled) backfillPercent else null,
             )
         )
@@ -266,20 +261,6 @@ fun HabitEditorDialog(
                     )
                 }
 
-                if (allowInverseHabits) {
-                    CaptionedSection(
-                        caption = "Behaviour",
-                        helpText = "Inverse habits are for breaking bad habits. " +
-                            "They start each day as done; tap only if the bad " +
-                            "habit happened, which marks that day as missed.",
-                    ) {
-                        InverseHabitToggle(
-                            checked = inverse,
-                            onCheckedChange = { inverse = it },
-                        )
-                    }
-                }
-
                 // --- Frequency card ---
                 CaptionedSection(caption = "Frequency") {
                     FrequencyPicker(
@@ -312,7 +293,6 @@ fun HabitEditorDialog(
                             onPercentChange = { backfillPercent = it },
                             startEpochDay = backfillStartEpochDay,
                             endEpochDay = backfillEndEpochDay,
-                            inverse = allowInverseHabits && inverse,
                         )
                     }
                 }
@@ -584,43 +564,6 @@ private fun IconGrid(selectedKey: String, accent: Color, onSelected: (String) ->
 }
 
 /**
- * 2×2 grid of equally-sized cards for the four frequency kinds, with a
- * stepper appearing below for the two kinds that take a number. The grid
- * layout means each card has predictable visual weight regardless of
- * label length, fixing the awkward "Daily is tiny, Custom is huge" look
- * the FlowRow chips had before.
- */
-@Composable
-private fun InverseHabitToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 2.dp, vertical = 2.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Inverse habit",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = "For habits you want to avoid",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-/**
  * Switch row + percentage stepper for backfilling a habit's history.
  *
  * The subtitle spells out exactly what "backfill" will do — the date it
@@ -635,7 +578,6 @@ private fun HistoryBackfillPicker(
     onPercentChange: (Int) -> Unit,
     startEpochDay: Long,
     endEpochDay: Long,
-    inverse: Boolean,
 ) {
     val startLabel = remember(startEpochDay) {
         LocalDate.ofEpochDay(startEpochDay).format(BACKFILL_DATE_FORMAT)
@@ -675,7 +617,7 @@ private fun HistoryBackfillPicker(
                 CompactStepper(
                     value = percent,
                     onChange = onPercentChange,
-                    label = { v -> if (inverse) "$v% clean" else "$v% completed" },
+                    label = { v -> "$v% completed" },
                     min = HabitBackfill.MIN_PERCENT,
                     max = 100,
                     step = HabitBackfill.PERCENT_STEP,
@@ -687,6 +629,13 @@ private fun HistoryBackfillPicker(
 
 private val BACKFILL_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")
 
+/**
+ * 2×2 grid of equally-sized cards for the four frequency kinds, with a
+ * stepper appearing below for the two kinds that take a number. The grid
+ * layout means each card has predictable visual weight regardless of
+ * label length, fixing the awkward "Daily is tiny, Custom is huge" look
+ * the FlowRow chips had before.
+ */
 @Composable
 private fun FrequencyPicker(
     kind: FrequencyKind,

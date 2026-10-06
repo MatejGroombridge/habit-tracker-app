@@ -47,9 +47,15 @@ data class Habit(
     /**
      * When non-null, the habit is paused and shouldn't count for streaks
      * or the analytics grid. Value is the epoch-day on which the pause
-     * began; `null` = active.
+     * began; `null` = active. Pauses that have ended live in [pausedRanges].
      */
     val pausedSinceEpochDay: Long? = null,
+    /**
+     * Pauses that have since been resumed, so the paused stretch keeps
+     * reading as paused (rather than as missed days) after the habit
+     * restarts. Also records the time a restored habit spent archived.
+     */
+    val pausedRanges: List<DayRange> = emptyList(),
     /**
      * Whether this habit appears in the daily reminder notification.
      * Defaults to true so legacy habits keep their existing behaviour.
@@ -58,28 +64,88 @@ data class Habit(
      */
     val includeInReminders: Boolean = true,
     /**
-     * Inverse habits are for breaking bad habits. They start each day in a
-     * visually-completed / successful state. If the user does the thing
-     * they're trying to avoid, tapping the card records that day in
-     * [completedDays] as an occurrence/failure, which makes the habit look
-     * incomplete for that day.
-     *
-     * We intentionally reuse [completedDays] rather than adding another set:
-     * for normal habits it means "completed", for inverse habits it means
-     * "bad habit occurred". This keeps migration tiny and preserves the
-     * existing JSON shape with a single new boolean defaulting to false.
+     * The day the habit was archived, or `null` if it isn't — or if it was
+     * archived before this was recorded. Stats stop counting the habit from
+     * this day on, so archiving doesn't rewrite past days.
      */
-    val inverse: Boolean = false,
+    val archivedAtEpochDay: Long? = null,
+    /**
+     * The first day of real tracking when the history before it was
+     * backfilled (see [HabitBackfill]), or `null` when nothing was. Stats
+     * start here so they're never computed over synthetic days.
+     */
+    val trackedSinceEpochDay: Long? = null,
 ) {
     fun isCompletedOn(epochDay: Long): Boolean = epochDay in completedDays
-
-    /** Whether this day has been resolved successfully for streak/stat purposes. */
-    fun isSuccessfulOn(epochDay: Long): Boolean {
-        if (epochDay < createdAtEpochDay) return false
-        return if (inverse) epochDay !in completedDays else epochDay in completedDays
-    }
     fun isSkippedOn(epochDay: Long): Boolean = epochDay in skippedDays
     val isPaused: Boolean get() = pausedSinceEpochDay != null
+
+    /** Whether [epochDay] falls in the current pause or any earlier one. */
+    fun isPausedOn(epochDay: Long): Boolean {
+        val since = pausedSinceEpochDay
+        if (since != null && epochDay >= since) return true
+        return pausedRanges.any { epochDay in it }
+    }
+
+    /** First day of real (non-backfilled) history. */
+    val realStartEpochDay: Long get() = trackedSinceEpochDay ?: createdAtEpochDay
+
+    /** Due every day — the only habits stats and perfect days consider. */
+    val isDaily: Boolean
+        get() = when (val f = frequency) {
+            HabitFrequency.Daily -> true
+            is HabitFrequency.EveryNDays -> f.days == 1
+            else -> false
+        }
+
+    /**
+     * Returns a copy paused from [todayEpochDay], or resumed — in which case
+     * the finished pause is kept in [pausedRanges]. Today itself is active
+     * again on resume, so a pause started and ended on the same day leaves
+     * no trace.
+     */
+    fun withPaused(paused: Boolean, todayEpochDay: Long): Habit {
+        val since = pausedSinceEpochDay
+        return when {
+            paused -> if (since != null) this else copy(pausedSinceEpochDay = todayEpochDay)
+            since == null -> this
+            else -> copy(
+                pausedSinceEpochDay = null,
+                pausedRanges = pausedRanges.plusRange(since, todayEpochDay - 1),
+            )
+        }
+    }
+
+    /**
+     * Returns a copy archived on [todayEpochDay], or restored. A restored
+     * habit's archived stretch is recorded as a pause so it doesn't come
+     * back as a run of missed days.
+     */
+    fun withArchived(archived: Boolean, todayEpochDay: Long): Habit {
+        if (archived) {
+            return if (this.archived) this
+            else copy(archived = true, archivedAtEpochDay = todayEpochDay)
+        }
+        if (!this.archived) return this
+        val since = archivedAtEpochDay
+        return copy(
+            archived = false,
+            archivedAtEpochDay = null,
+            pausedRanges = if (since == null) pausedRanges
+            else pausedRanges.plusRange(since, todayEpochDay - 1),
+        )
+    }
+
+    /**
+     * Whether [epochDay] neither extends nor breaks a streak: paused or
+     * skipped days are the user explicitly setting the habit aside.
+     */
+    private fun isNeutralOn(epochDay: Long): Boolean =
+        epochDay in skippedDays || isPausedOn(epochDay)
+
+    /** Earliest day any streak could include. */
+    private val streakFloor: Long
+        get() = minOf(createdAtEpochDay, completedDays.minOrNull() ?: createdAtEpochDay)
 
     /** Returns a copy with [epochDay] toggled in [completedDays]. */
     fun toggleCompletion(epochDay: Long): Habit {
@@ -97,55 +163,44 @@ data class Habit(
     fun markNotCompleted(epochDay: Long): Habit =
         if (epochDay !in completedDays) this else copy(completedDays = completedDays - epochDay)
 
-    /** Length of the longest streak of consecutive days ending on [today], or 0. */
+    /**
+     * Completed days in the run ending on [today], or 0. Paused and skipped
+     * days are stepped over without counting, so a pause freezes the streak
+     * rather than resetting it.
+     */
     fun currentStreak(today: Long): Long {
         var streak = 0L
-        // Today is still in progress: a normal habit not yet completed today
-        // hasn't broken its streak — the day isn't missed until it's over. So
-        // start counting from yesterday in that case. Inverse habits don't get
-        // this grace: they're successful today by default, so an unsuccessful
-        // today means the bad habit already occurred and the streak is broken.
-        var day = if (!inverse && !isSuccessfulOn(today)) today - 1 else today
-        while (day >= createdAtEpochDay && isSuccessfulOn(day)) {
-            streak++
+        var day = today
+        val floor = streakFloor
+        while (day >= floor) {
+            when {
+                day in completedDays -> streak++
+                // Today is still in progress: not yet completing it hasn't
+                // broken the streak — the day isn't missed until it's over.
+                day == today || isNeutralOn(day) -> Unit
+                else -> break
+            }
             day--
         }
         return streak
     }
 
     /**
-     * The longest run of consecutive completed days this habit has ever had.
-     * Used in the All Time analytics row as a "personal best" alongside the
-     * current streak.
-     *
-     * Walks the sorted completion set once, so this is O(n log n) due to the
-     * sort and O(n) thereafter. Empty set → 0.
+     * The most completed days in any single run, with paused and skipped
+     * days bridging rather than breaking it (see [currentStreak]). Used as
+     * the "personal best" alongside the current streak.
      */
-    fun longestStreak(): Long {
-        if (!inverse) {
-            if (completedDays.isEmpty()) return 0L
-            val sorted = completedDays.sorted()
-            var best = 1L
-            var run = 1L
-            for (i in 1 until sorted.size) {
-                run = if (sorted[i] == sorted[i - 1] + 1) run + 1 else 1L
-                if (run > best) best = run
-            }
-            return best
-        }
-
-        // For inverse habits, success is the absence of an occurrence. Bound
-        // the scan to the tracking window so "infinite success before creation"
-        // doesn't exist.
-        val today = java.time.LocalDate.now().toEpochDay()
+    fun longestStreak(today: Long): Long {
         var best = 0L
         var run = 0L
-        for (day in createdAtEpochDay..today) {
-            if (isSuccessfulOn(day)) {
-                run++
-                if (run > best) best = run
-            } else {
-                run = 0L
+        for (day in streakFloor..today) {
+            when {
+                day in completedDays -> {
+                    run++
+                    if (run > best) best = run
+                }
+                day == today || isNeutralOn(day) -> Unit
+                else -> run = 0L
             }
         }
         return best
@@ -170,8 +225,7 @@ data class Habit(
         // an outstanding TODO. The All-Time grid still shows them as
         // skip-circles / pause-cells (those use isCompletedOn directly).
         if (day in skippedDays) return true
-        if (pausedSinceEpochDay != null && day >= pausedSinceEpochDay) return true
-        if (inverse) return day !in completedDays
+        if (isPausedOn(day)) return true
         if (day in completedDays) return true
         val window = when (val f = frequency) {
             HabitFrequency.Daily -> return false
@@ -215,3 +269,13 @@ data class Habit(
         const val DEEP_LINK_HOST = "habit"
     }
 }
+
+/** An inclusive run of epoch days, e.g. a finished pause. */
+@Serializable
+data class DayRange(val start: Long, val end: Long) {
+    operator fun contains(epochDay: Long): Boolean = epochDay in start..end
+}
+
+/** Appends `start..end`, ignoring it when empty (e.g. paused and resumed the same day). */
+private fun List<DayRange>.plusRange(start: Long, end: Long): List<DayRange> =
+    if (end < start) this else this + DayRange(start, end)

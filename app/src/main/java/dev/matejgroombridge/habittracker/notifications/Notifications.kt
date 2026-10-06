@@ -8,8 +8,10 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import dev.matejgroombridge.habittracker.EXTRA_OPEN_TAB
 import dev.matejgroombridge.habittracker.MainActivity
 import dev.matejgroombridge.habittracker.R
+import dev.matejgroombridge.habittracker.TAB_STATS
 
 /** Channel + notification helpers, isolated from the scheduler logic. */
 object Notifications {
@@ -65,5 +67,51 @@ object Notifications {
             .build()
 
         mgr.notify(NOTIFICATION_ID_BASE + slot, notification)
+    }
+
+    const val RECAP_CHANNEL_ID = "monthly_recap"
+    private const val RECAP_NOTIFICATION_ID = 9_100_000
+
+    /** Own channel so the recap can be silenced without losing daily reminders. */
+    private fun ensureRecapChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val mgr = ContextCompat.getSystemService(context, NotificationManager::class.java)
+            ?: return
+        if (mgr.getNotificationChannel(RECAP_CHANNEL_ID) != null) return
+        mgr.createNotificationChannel(
+            NotificationChannel(
+                RECAP_CHANNEL_ID,
+                "Monthly recap",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = "A summary of last month's habits on the 1st." },
+        )
+    }
+
+    /** Posts the monthly recap; tapping it opens the Stats tab. */
+    fun postRecap(context: Context, title: String, body: String) {
+        ensureRecapChannel(context)
+        val mgr = ContextCompat.getSystemService(context, NotificationManager::class.java)
+            ?: return
+
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_OPEN_TAB, TAB_STATS)
+        }
+        val pi = PendingIntent.getActivity(
+            context, RECAP_NOTIFICATION_ID, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = NotificationCompat.Builder(context, RECAP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        mgr.notify(RECAP_NOTIFICATION_ID, notification)
     }
 }

@@ -42,6 +42,10 @@ object ReminderScheduler {
      *  - From [ReminderReceiver] when [Intent.ACTION_BOOT_COMPLETED] fires.
      */
     suspend fun rescheduleAll(context: Context) {
+        // The recap has its own toggle, so it's armed regardless of whether
+        // daily reminders are on. Done here so boot + app start cover it too.
+        MonthlyRecapScheduler.reschedule(context)
+
         // Always cancel everything first so disabling reminders fully clears.
         for (slot in 0 until MAX_SLOTS) cancelSlot(context, slot)
 
