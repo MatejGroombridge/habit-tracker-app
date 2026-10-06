@@ -1,6 +1,11 @@
 # Changelog
 
 
+## v2.4.0 — 2026-10-06
+
+Stats tab with perfect days, insights and a monthly recap
+
+
 ## v2.3.0 — 2026-09-15
 
 Backfill history for habits you started tracking later than the rest

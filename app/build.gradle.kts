@@ -29,8 +29,8 @@ android {
         applicationId = "dev.matejgroombridge.habittracker"
         minSdk = 26          // Android 8.0+ (covers ~95% of devices, allows modern APIs)
         targetSdk = 35       // Android 15
-        versionCode = 13
-        versionName = "2.3.0"
+        versionCode = 14
+        versionName = "2.4.0"
     }
 
     signingConfigs {
